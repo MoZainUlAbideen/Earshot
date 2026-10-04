@@ -76,6 +76,9 @@ Podcast Index API / RSS feed
 - **Windows + PowerShell** dev machine. Project at `D:\VS-Code-Projects\Earshot`.
 - **Job queue:** Postgres table with `SKIP LOCKED` rather than Redis, which is
   simpler and a strong interview talking point.
+- **Local Postgres:** runs in Docker Desktop via `docker-compose.yml`, the same
+  image CI and Render will use (dev/prod parity). Chosen over hosted Neon (needs
+  internet, shared state in tests) and a native install (no CI parity).
 - **ASR:** Groq's Whisper API (free tier, rate-limited), with local
   faster-whisper as the fallback.
 - **Backend:** FastAPI, deployed on Render free tier (Docker). It has no GPU and
@@ -163,16 +166,20 @@ podcasts.
 - [x] Repo scaffolded with uv, smoke test passing (2 tests)
 - [x] GitHub repo created (`MoZainUlAbideen/Earshot`) and first commit pushed
 - [x] **M0 complete** — LEARNINGS.md entry written
+- [x] M1 step 1: Docker Desktop installed; Postgres 17 runs via
+      `docker-compose.yml` (`docker compose up -d --wait`), credentials in `.env`
 
 ## 9. Next step
 
-M1, ingestion and job queue. Step 1 is planning only, with no code:
-- Decide where Postgres runs during local dev (e.g. Docker vs a free hosted
-  Postgres) and how tests get a database
-- Design the `episodes` and `jobs` tables (content hash for dedup, job status,
-  attempts/retries, `SKIP LOCKED` claiming)
-- Pick the first small code step (likely the Podcast Index API client with
-  tests that don't hit the real API)
+M1 step 2, database schema and connection:
+- Add a Postgres driver (psycopg 3) and a small `db` module that connects
+  using `DATABASE_URL` from `.env`
+- Design and create the `episodes` table (content hash, unique constraint for
+  dedup) and the `jobs` table (status, attempts, `SKIP LOCKED` claiming)
+- Tests run against the Docker Postgres, each starting from a clean state
 
-Explain the plan and the concepts (idempotency, queues, retries) before
-writing code.
+Explain the table design and the concepts (idempotency, queues, retries)
+before writing code.
+
+*Gotcha:* in Windows PowerShell 5.1, `docker compose exec ... -c "..."`
+mangles nested quotes. Use Git Bash for one-off `psql` commands.
