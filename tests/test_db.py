@@ -1,23 +1,10 @@
 """The schema's guarantees: dedup, idempotent enqueue, valid statuses, sane defaults."""
 
-import psycopg
 import pytest
 from psycopg import errors
 
 from earshot import db as db_module
 from earshot.db import apply_schema, get_database_url
-
-
-def insert_episode(conn: psycopg.Connection, dedup_key: str = "key-1") -> int:
-    return conn.execute(
-        """
-        INSERT INTO episodes (feed_url, guid, title, audio_url, dedup_key)
-        VALUES ('https://example.com/feed.xml', 'guid-1', 'Ep 1',
-                'https://example.com/ep1.mp3', %s)
-        RETURNING id
-        """,
-        (dedup_key,),
-    ).fetchone()[0]
 
 
 def test_missing_database_url_fails_fast(monkeypatch):
@@ -45,21 +32,21 @@ def test_apply_schema_is_idempotent(db):
     assert {"episodes", "jobs"} <= tables
 
 
-def test_duplicate_episode_is_rejected(db):
-    insert_episode(db, dedup_key="same")
+def test_duplicate_episode_is_rejected(make_episode):
+    make_episode(dedup_key="same")
     with pytest.raises(errors.UniqueViolation):
-        insert_episode(db, dedup_key="same")
+        make_episode(dedup_key="same")
 
 
-def test_duplicate_job_is_rejected(db):
-    episode_id = insert_episode(db)
+def test_duplicate_job_is_rejected(db, make_episode):
+    episode_id = make_episode()
     db.execute("INSERT INTO jobs (episode_id, kind) VALUES (%s, 'transcribe')", (episode_id,))
     with pytest.raises(errors.UniqueViolation):
         db.execute("INSERT INTO jobs (episode_id, kind) VALUES (%s, 'transcribe')", (episode_id,))
 
 
-def test_invalid_job_status_is_rejected(db):
-    episode_id = insert_episode(db)
+def test_invalid_job_status_is_rejected(db, make_episode):
+    episode_id = make_episode()
     with pytest.raises(errors.CheckViolation):
         db.execute(
             "INSERT INTO jobs (episode_id, kind, status) VALUES (%s, 'transcribe', 'banana')",
@@ -67,8 +54,8 @@ def test_invalid_job_status_is_rejected(db):
         )
 
 
-def test_new_job_defaults(db):
-    episode_id = insert_episode(db)
+def test_new_job_defaults(db, make_episode):
+    episode_id = make_episode()
     status, attempts, max_attempts = db.execute(
         """
         INSERT INTO jobs (episode_id, kind) VALUES (%s, 'transcribe')

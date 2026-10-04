@@ -168,27 +168,32 @@ podcasts.
 - [x] **M0 complete** — LEARNINGS.md entry written
 - [x] M1 step 1: Docker Desktop installed; Postgres 17 runs via
       `docker-compose.yml` (`docker compose up -d --wait`), credentials in `.env`
-
 - [x] M1 step 2: `src/earshot/db.py` (connect with timeout, `apply_schema`),
       `src/earshot/schema.sql` (`episodes` with UNIQUE `dedup_key`, `jobs` with
       status/attempts/`run_after`, UNIQUE `(episode_id, kind)`), 9 tests passing
       against a separate `earshot_test` DB
+- [x] M1 step 3: `src/earshot/queue.py`: `enqueue` (idempotent), `claim`
+      (`FOR UPDATE SKIP LOCKED`, attempts counted on claim), `complete`, and `fail`
+      (exponential backoff 30s/60s/120s, then `failed`). 24 tests passing,
+      including concurrency tests: two-worker lock skip, and 4 threads × 40
+      jobs claimed exactly once. Mutation-tested: removing SKIP LOCKED makes
+      the concurrency tests fail.
 
 ## 9. Next step
 
-M1 step 3, the job queue operations (in a `queue` module, tested against
-`earshot_test`):
-- `enqueue(episode_id, kind)`: idempotent (`ON CONFLICT DO NOTHING`)
-- `claim(worker_id)`: `SELECT ... FOR UPDATE SKIP LOCKED`, so two workers never
-  get the same job (test this with two concurrent connections)
-- `complete(job_id)` and `fail(job_id, error)`: retry with exponential backoff
-  via `run_after` until `max_attempts`, then mark `failed`
-- Later: reclaim jobs stuck in `running` (worker crashed) using `locked_at`
+M1 step 4: the Podcast Index / RSS client.
+- Zain needs a Podcast Index API key and secret (free at api.podcastindex.org)
+  in `.env` before the live call. Tests must not hit the real API (use saved
+  sample responses).
+- Parse episodes (guid, title, enclosure audio URL, published date, duration),
+  compute `dedup_key = sha256(feed_url + guid)`, insert with
+  `ON CONFLICT (dedup_key) DO NOTHING`, and `enqueue(episode_id, 'transcribe')`
+- Re-running ingestion must be a no-op (idempotency test)
 
-Then M1 step 4: the Podcast Index / RSS client that inserts episodes (dedup by
-`dedup_key`) and enqueues `transcribe` jobs.
+Still to do before closing M1: reclaim jobs stuck in `running` (worker crashed)
+using `locked_at` plus a timeout; then the M1 LEARNINGS entry.
 
-Explain each operation and its concept before writing code.
+Explain each part and its concept before writing code.
 
 *Gotchas (include in the M1 LEARNINGS entry):*
 - In Windows PowerShell 5.1, `docker compose exec ... -c "..."` mangles nested

@@ -41,3 +41,24 @@ def db(test_db_url):
     with connect(test_db_url, autocommit=True) as conn:
         conn.execute("TRUNCATE jobs, episodes RESTART IDENTITY CASCADE")
         yield conn
+
+
+@pytest.fixture
+def make_episode(db):
+    """Factory: insert an episode and return its id. Keys are unique unless given."""
+    counter = 0
+
+    def _make(dedup_key: str | None = None) -> int:
+        nonlocal counter
+        counter += 1
+        return db.execute(
+            """
+            INSERT INTO episodes (feed_url, guid, title, audio_url, dedup_key)
+            VALUES ('https://example.com/feed.xml', %(guid)s, %(guid)s,
+                    'https://example.com/ep.mp3', %(key)s)
+            RETURNING id
+            """,
+            {"guid": f"guid-{counter}", "key": dedup_key or f"key-{counter}"},
+        ).fetchone()[0]
+
+    return _make
