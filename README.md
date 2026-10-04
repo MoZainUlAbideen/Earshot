@@ -11,8 +11,8 @@ questions across many episodes at once. Every claim in an answer carries a
 > *"What do AI researchers say about scaling laws hitting a wall?"*
 > → An answer drawn from several episodes, with each claim linked to the moment it was said.
 
-**Status:** 🚧 In active development. Ingestion and the job queue are working;
-the speech pipeline is next. See [Roadmap](#roadmap).
+**Status:** 🚧 In active development. Milestone 1 (ingestion and a crash-safe
+job queue) is complete; the speech pipeline is next. See [Roadmap](#roadmap).
 
 ---
 
@@ -38,7 +38,7 @@ One kind of data flows through one straight pipeline: **audio → text → searc
 | Stage | What happens | Why it's built this way |
 |---|---|---|
 | **1. Ingest** | Read a podcast's RSS feed and store each episode's metadata and audio URL. | Each episode gets a fingerprint (`sha256(feed + guid)`) with a UNIQUE constraint, so re-running ingestion never creates duplicates. |
-| **2. Queue** | Every new episode gets a `transcribe` job in a Postgres table. | Workers claim jobs with `SELECT … FOR UPDATE SKIP LOCKED`: parallel workers never grab the same job, and no Redis is needed. Failures retry with exponential backoff. |
+| **2. Queue** | Every new episode gets a `transcribe` job in a Postgres table. | Workers claim jobs with `SELECT … FOR UPDATE SKIP LOCKED`: parallel workers never grab the same job, and no Redis is needed. Failures retry with exponential backoff. Jobs from crashed workers are reclaimed after a timeout, and a fencing token stops a slow worker from overwriting the new owner. |
 | **3. Chunk** | Voice activity detection cuts audio at silences. | Chunks never split a word in half, which would corrupt transcripts at the boundaries. |
 | **4. Transcribe** | Whisper turns speech into text with word-level timestamps; chunks are stitched back together. | Groq's Whisper API for speed, with local `faster-whisper` as a fallback when rate-limited. |
 | **5. Enrich** | Detect sponsor segments, extract people/companies/papers, and generate chapters. | Zero-shot classification keeps ads out of answers without hand-labelled training data. |
@@ -52,7 +52,8 @@ One kind of data flows through one straight pipeline: **audio → text → searc
   survive crashes), queryable, and claimed atomically. At this scale (hundreds of
   episodes), Postgres is more than enough.
 - **Idempotency everywhere.** Ingesting the same feed twice, or enqueueing the same job
-  twice, is a no-op, enforced by the database rather than by application code.
+  twice, is a no-op, enforced by the database rather than by application code. The queue
+  delivers at-least-once (a reclaimed job can run twice), so every stage is safe to repeat.
 - **Fail fast.** Every network call has a timeout, and missing config stops the app at
   startup with a clear message instead of failing halfway through a job.
 - **Stream, never rehost.** Podcasts are copyrighted. Earshot stores transcripts for search
@@ -76,7 +77,7 @@ One kind of data flows through one straight pipeline: **audio → text → searc
 | Milestone | Scope | Status |
 |---|---|---|
 | **M0** Setup | uv project, tests, secrets hygiene | ✅ Done |
-| **M1** Ingestion + queue | RSS ingestion, dedup, Postgres job queue (claim / retry / backoff) | 🚧 Mostly done: stuck-job recovery remaining |
+| **M1** Ingestion + queue | RSS ingestion, dedup, Postgres job queue (claim / retry / backoff / crash recovery) | ✅ Done |
 | **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | ⏳ Next |
 | **M3** Enrichment | Ad detection, NER, chapters + summaries | Planned |
 | **M4** Retrieval | Hybrid BM25 + embeddings, reranker, retrieval evals | Planned |
@@ -153,7 +154,7 @@ src/earshot/
   db.py           # connection (with timeout) and schema setup
   schema.sql      # episodes + jobs tables
   ingest.py       # RSS fetch → parse → dedup → save + enqueue
-  queue.py        # enqueue / claim (SKIP LOCKED) / complete / fail (backoff)
+  queue.py        # enqueue / claim (SKIP LOCKED) / complete / fail (backoff) / reclaim_stale
 tests/            # pytest suite + fixtures (sample RSS feed)
 docs/             # project plan and decisions
 docker-compose.yml  # local Postgres 17

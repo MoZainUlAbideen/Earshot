@@ -1,4 +1,5 @@
-"""Job queue behaviour: idempotent enqueue, exclusive claiming, retries with backoff."""
+"""Job queue behaviour: idempotent enqueue, exclusive claiming, retries with backoff,
+stale-job recovery, and fencing against out-of-date workers."""
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
@@ -6,7 +7,15 @@ from datetime import timedelta
 import pytest
 
 from earshot.db import connect
-from earshot.queue import BACKOFF_BASE_SECONDS, claim, complete, enqueue, fail
+from earshot.queue import (
+    BACKOFF_BASE_SECONDS,
+    LeaseLost,
+    claim,
+    complete,
+    enqueue,
+    fail,
+    reclaim_stale,
+)
 
 KIND = "transcribe"
 
@@ -114,29 +123,38 @@ def test_concurrent_workers_claim_every_job_exactly_once(db, make_episode, test_
     assert set(all_claimed) == job_ids, "a job was never claimed"
 
 
+
+
+def make_stale(conn, job_id):
+    """Pretend the worker took this job an hour ago and then went silent."""
+    conn.execute("UPDATE jobs SET locked_at = now() - interval '1 hour' WHERE id = %s", (job_id,))
+
+
 # --- complete --------------------------------------------------------------
 
 def test_complete_marks_job_done_and_unlocks_it(db, make_episode):
-    job_id = enqueue(db, make_episode(), KIND)
-    claim(db, "worker-1", KIND)
-    complete(db, job_id)
-    status, _, locked_by, locked_at, _, _ = job_row(db, job_id)
+    enqueue(db, make_episode(), KIND)
+    job = claim(db, "worker-1", KIND)
+    complete(db, job)
+    status, _, locked_by, locked_at, _, _ = job_row(db, job.id)
     assert (status, locked_by, locked_at) == ("done", None, None)
 
 
-def test_complete_rejects_a_job_that_is_not_running(db, make_episode):
-    job_id = enqueue(db, make_episode(), KIND)  # queued, never claimed
-    with pytest.raises(ValueError, match="not running"):
-        complete(db, job_id)
+def test_completing_twice_raises_lease_lost(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    job = claim(db, "worker-1", KIND)
+    complete(db, job)
+    with pytest.raises(LeaseLost):
+        complete(db, job)
 
 
 # --- fail: retries and backoff ---------------------------------------------
 
 def test_fail_requeues_with_backoff(db, make_episode):
-    job_id = enqueue(db, make_episode(), KIND)
-    claim(db, "worker-1", KIND)
-    assert fail(db, job_id, "Groq 429: rate limited") == "queued"
-    status, _, locked_by, _, last_error, delay = job_row(db, job_id)
+    enqueue(db, make_episode(), KIND)
+    job = claim(db, "worker-1", KIND)
+    assert fail(db, job, "Groq 429: rate limited") == "queued"
+    status, _, locked_by, _, last_error, delay = job_row(db, job.id)
     assert (status, locked_by, last_error) == ("queued", None, "Groq 429: rate limited")
     assert delay == timedelta(seconds=BACKOFF_BASE_SECONDS)
     assert claim(db, "worker-1", KIND) is None  # still backing off
@@ -146,8 +164,8 @@ def test_backoff_doubles_on_each_retry(db, make_episode):
     job_id = enqueue(db, make_episode(), KIND)
     delays = []
     for _ in range(2):
-        claim(db, "worker-1", KIND)
-        fail(db, job_id, "boom")
+        job = claim(db, "worker-1", KIND)
+        fail(db, job, "boom")
         delays.append(job_row(db, job_id)[5])
         make_ready(db, job_id)
     assert delays == [timedelta(seconds=BACKOFF_BASE_SECONDS),
@@ -158,14 +176,87 @@ def test_job_is_marked_failed_after_max_attempts(db, make_episode):
     job_id = enqueue(db, make_episode(), KIND)
     statuses = []
     for _ in range(3):  # max_attempts defaults to 3
-        claim(db, "worker-1", KIND)
-        statuses.append(fail(db, job_id, "boom"))
+        job = claim(db, "worker-1", KIND)
+        statuses.append(fail(db, job, "boom"))
         make_ready(db, job_id)
     assert statuses == ["queued", "queued", "failed"]
     assert claim(db, "worker-1", KIND) is None  # failed jobs are never handed out again
 
 
-def test_fail_rejects_a_job_that_is_not_running(db, make_episode):
+def test_failing_a_finished_job_raises_lease_lost(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    job = claim(db, "worker-1", KIND)
+    complete(db, job)
+    with pytest.raises(LeaseLost):
+        fail(db, job, "boom")
+
+
+# --- reclaim_stale: recovering from crashed workers ------------------------
+
+def test_stale_job_is_requeued_and_can_be_claimed_again(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    job = claim(db, "worker-crashed", KIND)
+    make_stale(db, job.id)
+
+    assert reclaim_stale(db) == {"queued": 1}
+    status, _, locked_by, _, last_error, _ = job_row(db, job.id)
+    assert (status, locked_by) == ("queued", None)
+    assert "worker-crashed" in last_error
+
+    retry = claim(db, "worker-2", KIND)
+    assert (retry.id, retry.attempts) == (job.id, 2)  # the crashed attempt still counts
+
+
+def test_fresh_running_job_is_left_alone(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    job = claim(db, "worker-busy", KIND)
+    assert reclaim_stale(db) == {}
+    assert job_row(db, job.id)[0] == "running"
+
+
+def test_queued_and_done_jobs_are_never_reclaimed(db, make_episode):
+    enqueue(db, make_episode(), KIND)          # stays queued
+    enqueue(db, make_episode(), KIND)
+    done = claim(db, "worker-1", KIND)
+    complete(db, done)
+    db.execute("UPDATE jobs SET locked_at = now() - interval '1 hour'")  # old timestamps everywhere
+    assert reclaim_stale(db) == {}
+
+
+def test_poison_pill_is_failed_after_max_attempts(db, make_episode):
+    """A job that crashes every worker must eventually stop being retried."""
     job_id = enqueue(db, make_episode(), KIND)
-    with pytest.raises(ValueError, match="not running"):
-        fail(db, job_id, "boom")
+    results = []
+    for _ in range(3):
+        claim(db, "worker-doomed", KIND)
+        make_stale(db, job_id)
+        results.append(reclaim_stale(db))
+    assert results == [{"queued": 1}, {"queued": 1}, {"failed": 1}]
+    assert claim(db, "worker-1", KIND) is None
+
+
+# --- fencing: a slow worker must not overwrite the new owner ---------------
+
+def test_slow_worker_cannot_complete_a_reclaimed_job(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    slow = claim(db, "worker-slow", KIND)      # attempt 1
+    make_stale(db, slow.id)
+    reclaim_stale(db)
+    fresh = claim(db, "worker-fresh", KIND)    # attempt 2, same job
+
+    with pytest.raises(LeaseLost):
+        complete(db, slow)                     # the slow worker finally finishes: rejected
+    assert job_row(db, fresh.id)[:3] == ("running", 2, "worker-fresh")
+
+    complete(db, fresh)                        # the current owner still succeeds
+    assert job_row(db, fresh.id)[0] == "done"
+
+
+def test_slow_worker_cannot_fail_a_reclaimed_job(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    slow = claim(db, "worker-slow", KIND)
+    make_stale(db, slow.id)
+    reclaim_stale(db)
+    claim(db, "worker-fresh", KIND)
+    with pytest.raises(LeaseLost):
+        fail(db, slow, "timed out")

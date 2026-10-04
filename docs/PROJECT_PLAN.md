@@ -185,26 +185,32 @@ podcasts.
       (`earshot ingest <feed> --limit N`, `earshot status`). 40 tests passing.
       Live-tested on the Lex Fridman feed: 5 new, then 0 new on re-run.
 - [x] README rewritten as the public project overview
+- [x] M1 step 5: `reclaim_stale` (crashed-worker recovery, poison pills fail
+      after max attempts) plus fencing: `complete`/`fail` take the claimed `Job`
+      and match on `attempts`, raising `LeaseLost` for out-of-date claims.
+      46 tests passing; fencing mutation-tested.
+- [x] **M1 complete**: LEARNINGS.md entry written, README roadmap updated
 
 ## 9. Next step
 
-M1 step 5 (last one in M1): reclaim stuck jobs.
-- A worker that crashes leaves its job `running` forever. Add
-  `reclaim_stale(conn, older_than)`: jobs `running` with `locked_at` older than
-  the timeout go back to `queued` (or to `failed` if attempts are used up)
-- Tests: stale jobs are reclaimed, fresh ones are left alone, exhausted ones fail
-
-Then close M1: write the LEARNINGS.md entry (with the gotchas below) and update
-the README roadmap.
+M2 step 1, speech pipeline planning (no code until the plan is agreed):
+- **Prerequisite (Zain):** a Groq API key in `.env` (`GROQ_API_KEY`)
+- **Check Groq's current audio rate limits and file-size limits** (section 6
+  requires this before M2). They decide chunk size and batch size, so document
+  the trade-off.
+- Audio handling: stream the episode to a temp file for processing and delete it
+  afterwards (never stored or served, consistent with the copyright constraint)
+- Pipeline: Silero VAD → chunks cut at silences → Whisper with word timestamps
+  → stitch chunks with correct time offsets
+- A worker loop: `reclaim_stale` → `claim('transcribe')` → process → `complete`
+  or `fail`. It must be idempotent, since delivery is at-least-once.
+- Eval: WER on a small LibriSpeech subset, plus ~10 minutes hand-corrected by Zain
 
 *Data note:* some real feeds omit `<itunes:duration>` (3 of the 5 Lex Fridman
-episodes), so `duration_seconds` can be NULL. M2 will measure it from the audio.
+episodes), so `duration_seconds` can be NULL. M2 should measure it from the audio.
 
-*Gotchas (include in the M1 LEARNINGS entry):*
+*Dev notes:*
 - In Windows PowerShell 5.1, `docker compose exec ... -c "..."` mangles nested
   quotes. Use Git Bash for one-off `psql` commands.
-- Tests hung forever: `localhost` resolved to IPv6 `::1` first, and Docker
-  accepted that connection but never answered, because the port is published on
-  127.0.0.1 only. Diagnosed with `pg_stat_activity` (zero connections) and
-  timed per-address connects. Fixed with `127.0.0.1` in `DATABASE_URL` plus a
-  `connect_timeout` on every connection, so it fails fast instead of hanging.
+- `DATABASE_URL` must use `127.0.0.1`, not `localhost` (IPv6 hang; see the M1
+  entry in LEARNINGS.md).
