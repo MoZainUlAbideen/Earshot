@@ -1,4 +1,8 @@
 # Earshot — project rules
+## Start here
+Read docs/PROJECT_PLAN.md at the start of every session. It holds the full
+plan, decisions already made, and current status. When a milestone step is
+finished, update section 8 (Current status) and section 9 (Next step) there.
 
 ## What this project is
 Earshot: ask questions across podcasts and get answers with timestamp
