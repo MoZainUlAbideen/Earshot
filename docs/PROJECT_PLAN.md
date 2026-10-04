@@ -169,17 +169,32 @@ podcasts.
 - [x] M1 step 1: Docker Desktop installed; Postgres 17 runs via
       `docker-compose.yml` (`docker compose up -d --wait`), credentials in `.env`
 
+- [x] M1 step 2: `src/earshot/db.py` (connect with timeout, `apply_schema`),
+      `src/earshot/schema.sql` (`episodes` with UNIQUE `dedup_key`, `jobs` with
+      status/attempts/`run_after`, UNIQUE `(episode_id, kind)`), 9 tests passing
+      against a separate `earshot_test` DB
+
 ## 9. Next step
 
-M1 step 2, database schema and connection:
-- Add a Postgres driver (psycopg 3) and a small `db` module that connects
-  using `DATABASE_URL` from `.env`
-- Design and create the `episodes` table (content hash, unique constraint for
-  dedup) and the `jobs` table (status, attempts, `SKIP LOCKED` claiming)
-- Tests run against the Docker Postgres, each starting from a clean state
+M1 step 3, the job queue operations (in a `queue` module, tested against
+`earshot_test`):
+- `enqueue(episode_id, kind)`: idempotent (`ON CONFLICT DO NOTHING`)
+- `claim(worker_id)`: `SELECT ... FOR UPDATE SKIP LOCKED`, so two workers never
+  get the same job (test this with two concurrent connections)
+- `complete(job_id)` and `fail(job_id, error)`: retry with exponential backoff
+  via `run_after` until `max_attempts`, then mark `failed`
+- Later: reclaim jobs stuck in `running` (worker crashed) using `locked_at`
 
-Explain the table design and the concepts (idempotency, queues, retries)
-before writing code.
+Then M1 step 4: the Podcast Index / RSS client that inserts episodes (dedup by
+`dedup_key`) and enqueues `transcribe` jobs.
 
-*Gotcha:* in Windows PowerShell 5.1, `docker compose exec ... -c "..."`
-mangles nested quotes. Use Git Bash for one-off `psql` commands.
+Explain each operation and its concept before writing code.
+
+*Gotchas (include in the M1 LEARNINGS entry):*
+- In Windows PowerShell 5.1, `docker compose exec ... -c "..."` mangles nested
+  quotes. Use Git Bash for one-off `psql` commands.
+- Tests hung forever: `localhost` resolved to IPv6 `::1` first, and Docker
+  accepted that connection but never answered, because the port is published on
+  127.0.0.1 only. Diagnosed with `pg_stat_activity` (zero connections) and
+  timed per-address connects. Fixed with `127.0.0.1` in `DATABASE_URL` plus a
+  `connect_timeout` on every connection, so it fails fast instead of hanging.
