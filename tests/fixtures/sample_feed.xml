@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Sample Podcast</title>
+    <link>https://example.com</link>
+    <description>Test fixture covering the edge cases parse_feed must handle.</description>
+
+    <!-- Older episode listed first: parse_feed must sort newest first. -->
+    <item>
+      <title>Episode 1: The Beginning</title>
+      <guid isPermaLink="false">sample-ep-1</guid>
+      <pubDate>Mon, 01 Sep 2025 10:00:00 +0000</pubDate>
+      <enclosure url="https://example.com/audio/ep1.mp3" length="1000" type="audio/mpeg"/>
+      <itunes:duration>45:30</itunes:duration>
+    </item>
+
+    <!-- Normal episode, h:mm:ss duration. -->
+    <item>
+      <title>Episode 3: Scaling Laws</title>
+      <guid isPermaLink="false">sample-ep-3</guid>
+      <pubDate>Wed, 01 Oct 2025 10:00:00 +0000</pubDate>
+      <enclosure url="https://example.com/audio/ep3.mp3" length="1000" type="audio/mpeg"/>
+      <itunes:duration>1:02:03</itunes:duration>
+    </item>
+
+    <!-- No guid: identity falls back to the audio URL. Duration in plain seconds. -->
+    <item>
+      <title>Episode 2: No Guid Here</title>
+      <pubDate>Mon, 15 Sep 2025 10:00:00 +0000</pubDate>
+      <enclosure url="https://example.com/audio/ep2.mp3" length="1000" type="audio/mpeg"/>
+      <itunes:duration>3600</itunes:duration>
+    </item>
+
+    <!-- No enclosure at all: nothing to transcribe, must be skipped. -->
+    <item>
+      <title>Show notes only</title>
+      <guid isPermaLink="false">sample-notes</guid>
+      <pubDate>Thu, 02 Oct 2025 10:00:00 +0000</pubDate>
+    </item>
+
+    <!-- Video enclosure: not audio, must be skipped. -->
+    <item>
+      <title>Video bonus</title>
+      <guid isPermaLink="false">sample-video</guid>
+      <pubDate>Fri, 03 Oct 2025 10:00:00 +0000</pubDate>
+      <enclosure url="https://example.com/video/bonus.mp4" length="1000" type="video/mp4"/>
+    </item>
+  </channel>
+</rss>

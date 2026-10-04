@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from earshot!")
+"""Earshot: ask podcasts questions, get answers with timestamp citations."""

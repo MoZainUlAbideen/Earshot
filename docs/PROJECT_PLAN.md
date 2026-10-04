@@ -79,6 +79,8 @@ Podcast Index API / RSS feed
 - **Local Postgres:** runs in Docker Desktop via `docker-compose.yml`, the same
   image CI and Render will use (dev/prod parity). Chosen over hosted Neon (needs
   internet, shared state in tests) and a native install (no CI parity).
+- **Ingestion source:** RSS feeds directly (no API key, the original source).
+  Podcast Index is used later for *discovery* (search for shows → feed URLs).
 - **ASR:** Groq's Whisper API (free tier, rate-limited), with local
   faster-whisper as the fallback.
 - **Backend:** FastAPI, deployed on Render free tier (Docker). It has no GPU and
@@ -178,22 +180,25 @@ podcasts.
       including concurrency tests: two-worker lock skip, and 4 threads × 40
       jobs claimed exactly once. Mutation-tested: removing SKIP LOCKED makes
       the concurrency tests fail.
+- [x] M1 step 4: `src/earshot/ingest.py` (RSS fetch with timeout → parse →
+      `dedup_key` → episode + job saved in one transaction) and `src/earshot/cli.py`
+      (`earshot ingest <feed> --limit N`, `earshot status`). 40 tests passing.
+      Live-tested on the Lex Fridman feed: 5 new, then 0 new on re-run.
+- [x] README rewritten as the public project overview
 
 ## 9. Next step
 
-M1 step 4: the Podcast Index / RSS client.
-- Zain needs a Podcast Index API key and secret (free at api.podcastindex.org)
-  in `.env` before the live call. Tests must not hit the real API (use saved
-  sample responses).
-- Parse episodes (guid, title, enclosure audio URL, published date, duration),
-  compute `dedup_key = sha256(feed_url + guid)`, insert with
-  `ON CONFLICT (dedup_key) DO NOTHING`, and `enqueue(episode_id, 'transcribe')`
-- Re-running ingestion must be a no-op (idempotency test)
+M1 step 5 (last one in M1): reclaim stuck jobs.
+- A worker that crashes leaves its job `running` forever. Add
+  `reclaim_stale(conn, older_than)`: jobs `running` with `locked_at` older than
+  the timeout go back to `queued` (or to `failed` if attempts are used up)
+- Tests: stale jobs are reclaimed, fresh ones are left alone, exhausted ones fail
 
-Still to do before closing M1: reclaim jobs stuck in `running` (worker crashed)
-using `locked_at` plus a timeout; then the M1 LEARNINGS entry.
+Then close M1: write the LEARNINGS.md entry (with the gotchas below) and update
+the README roadmap.
 
-Explain each part and its concept before writing code.
+*Data note:* some real feeds omit `<itunes:duration>` (3 of the 5 Lex Fridman
+episodes), so `duration_seconds` can be NULL. M2 will measure it from the audio.
 
 *Gotchas (include in the M1 LEARNINGS entry):*
 - In Windows PowerShell 5.1, `docker compose exec ... -c "..."` mangles nested
