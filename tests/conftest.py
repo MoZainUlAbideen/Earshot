@@ -30,7 +30,8 @@ def test_db_url() -> str:
 
     url = make_conninfo(dev_url, dbname=TEST_DB_NAME)
     with connect(url, autocommit=True) as conn:
-        conn.execute("DROP TABLE IF EXISTS jobs, episodes CASCADE")  # pick up schema changes
+        # Wipe everything so schema changes (incl. new tables) are always picked up.
+        conn.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
         apply_schema(conn)
     return url
 
@@ -39,7 +40,7 @@ def test_db_url() -> str:
 def db(test_db_url):
     """A connection to the test DB with empty tables (each test starts clean)."""
     with connect(test_db_url, autocommit=True) as conn:
-        conn.execute("TRUNCATE jobs, episodes RESTART IDENTITY CASCADE")
+        conn.execute("TRUNCATE chunks, jobs, episodes RESTART IDENTITY CASCADE")
         yield conn
 
 

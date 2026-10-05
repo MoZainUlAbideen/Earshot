@@ -107,6 +107,14 @@ Podcast Index API / RSS feed
   trade-off to document.
 - **Secrets:** API keys live in `.env` (gitignored). Only `.env.example` with
   placeholders is committed.
+- **Dynamic ad insertion (DAI):** many hosts stitch different ads into each
+  download, so the audio a listener streams may not match the audio we
+  transcribed, and citation timestamps can drift by the ad-length difference.
+  M2 handles the pipeline side (checkpoints are tied to the audio's sha256).
+  The product side is open: in M3, detect ad segments; in M6, consider
+  anchoring citations to nearby text and re-syncing in the player, or showing
+  a "timestamps may be offset by ads" note. Measure how often it happens on
+  the curated shows.
 
 ## 7. Milestones
 
@@ -244,17 +252,49 @@ audio.
   by default). Live result on the fixture: word-perfect, 1.1 s for 16 s of
   audio, word times inside the VAD segments after the offset.
 
-**Current step: M2 step 3, the `chunks` table and stitching.**
-- A `chunks` table: `(episode_id, idx)` UNIQUE, `start_s`/`end_s`, status,
-  words as JSONB (times already absolute). It's the checkpoint, so retries skip
-  done chunks.
-- `transcribe_episode(conn, episode_id, audio_path)`: plan chunks → for each
-  chunk not done: transcribe, offset words by `chunk.start`, save.
-  Idempotent: re-running does no new API calls.
-- A stitched transcript = all words ordered by time. Store `duration_seconds`
-  measured from the audio.
+- [x] Step 3: `chunks` table (row exists = done; UNIQUE `(episode_id, idx)`;
+  absolute word times in JSONB; `audio_sha256`) and `src/earshot/pipeline.py`:
+  `transcribe_episode` (checkpointed; a saved chunk is reused only if the audio
+  hash AND its idx/start/end match the current plan, otherwise all of the
+  episode's chunks are discarded; stores the measured duration) and
+  `get_transcript`. Test DB reset now drops the whole schema. 80 tests passing;
+  the fingerprint check is mutation-tested.
 
-*Gotchas for the M2 LEARNINGS entry:*
+- [x] Step 4: `src/earshot/download.py` (streamed, 60 s timeout, 400 MB cap,
+  partial file removed; 4xx permanent, 5xx/429/network retryable) and
+  `src/earshot/worker.py` (`process_one` routes errors by whose fault it is;
+  429 → `queue.defer`, which refunds the attempt AND pauses the whole worker,
+  since quota is per account; Ctrl+C hands the job back; temp dir always
+  deleted). `queue.fail(permanent=True)`. CLI `earshot worker [--once] [--id]`.
+  **Fencing moved from `attempts` to a new monotonic `lease` column**, because
+  defer's refund made attempt numbers reusable, so a stale claim could
+  collide with a live one (mutation-tested). 113 tests passing.
+- [x] **First real end-to-end run:** NPR *Up First* (35 min) → 4 chunks of
+  ~10 min → 5,927 words in 61 s wall time (~37 s download/decode/VAD, ~5 s per
+  Groq call). The Lex Fridman demo episodes were deleted from the dev DB
+  (Zain's choice) because 3–5 h episodes are too costly for the free tier.
+
+**Findings from the real run:**
+- **DAI confirmed:** the feed declared 2,115 s and the measured audio was
+  2,318 s (+203 s, matching +3.2 MB in `x-total-bytes`). Downloads differ per
+  listener (`listeningSessionID`). See the constraint in section 6.
+- **Whisper timestamp jitter:** 29 of 5,927 words step back in time, all
+  *within* a chunk (0 at chunk boundaries, so stitching is correct); mostly
+  0.02–0.4 s.
+- **Likely hallucination/alignment failure** at ~14:57: the phrase "…shape."
+  is repeated, and inserted words ("Andrey Kuvshinov, Father") have 0.02 s
+  durations. We store Whisper output raw. Signals for the eval: near-zero word
+  durations, backwards timestamps, repeated n-grams.
+- httpx logged full audio URLs (tracking IDs; private feeds carry tokens), so
+  the CLI now sets the httpx logger to WARNING (tested).
+
+**Current step: M2 step 5, evaluation.**
+- WER on a small LibriSpeech subset (known ground truth), large-v3 vs turbo
+- ~10 min of real podcast audio hand-corrected by Zain → WER on real speech
+- Hallucination signals from the findings above, counted per episode
+- Results table in README; decide the default model from the data
+
+*Gotchas for the M2 LEARNINGS entry (plus the findings above):*
 - `faster-whisper` 1.2.1 declares `av>=11` with no upper bound. uv installed
   av 19, which removed `av.open(metadata_errors=...)`, so we got a TypeError.
   Proved av 18.1.0 works in a throwaway overlay (`uv run --with`), then pinned

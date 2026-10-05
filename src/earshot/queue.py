@@ -4,10 +4,11 @@ Workers claim a job in one short statement and do the slow work outside any
 transaction; the 'running' status (not a held lock) keeps other workers away.
 
 A claim is a lease: if a worker dies, reclaim_stale() requeues its job after a
-timeout. `attempts` doubles as a fencing token: complete()/fail() only succeed
-for the claim that is still current, so a slow worker whose job was reclaimed
-can't overwrite the new owner's work. Delivery is at-least-once, so job
-handlers must be idempotent.
+timeout. Every claim bumps `lease`, a counter that never decreases, which is the
+fencing token: complete()/fail()/defer() only succeed for the claim that is still
+current, so a slow worker whose job was reclaimed can't overwrite the new owner's
+work. (`attempts` is the retry budget and can be refunded by defer(), so it can't
+be the token.) Delivery is at-least-once, so job handlers must be idempotent.
 """
 
 from dataclasses import dataclass
@@ -26,6 +27,7 @@ class Job:
     kind: str
     attempts: int
     max_attempts: int
+    lease: int  # fencing token for this claim
 
 
 def enqueue(conn: psycopg.Connection, episode_id: int, kind: str) -> int | None:
@@ -50,7 +52,7 @@ def claim(conn: psycopg.Connection, worker_id: str, kind: str) -> Job | None:
     row = conn.execute(
         """
         UPDATE jobs
-        SET status = 'running', attempts = attempts + 1,
+        SET status = 'running', attempts = attempts + 1, lease = lease + 1,
             locked_at = now(), locked_by = %(worker)s, updated_at = now()
         WHERE id = (
             SELECT id FROM jobs
@@ -59,7 +61,7 @@ def claim(conn: psycopg.Connection, worker_id: str, kind: str) -> Job | None:
             LIMIT 1
             FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, episode_id, kind, attempts, max_attempts
+        RETURNING id, episode_id, kind, attempts, max_attempts, lease
         """,
         {"worker": worker_id, "kind": kind},
     ).fetchone()
@@ -76,34 +78,54 @@ def complete(conn: psycopg.Connection, job: Job) -> None:
         """
         UPDATE jobs
         SET status = 'done', locked_at = NULL, locked_by = NULL, updated_at = now()
-        WHERE id = %s AND attempts = %s AND status = 'running'
+        WHERE id = %s AND lease = %s AND status = 'running'
         RETURNING id
         """,
-        (job.id, job.attempts),
+        (job.id, job.lease),
     ).fetchone()
     if row is None:
-        raise LeaseLost(f"job {job.id} attempt {job.attempts} is no longer current")
+        raise LeaseLost(f"job {job.id} lease {job.lease} is no longer current")
 
 
-def fail(conn: psycopg.Connection, job: Job, error: str) -> str:
+def fail(conn: psycopg.Connection, job: Job, error: str, *, permanent: bool = False) -> str:
     """Record a failure. Requeues with exponential backoff until max_attempts,
-    then marks the job 'failed'. Returns the job's new status."""
+    then marks the job 'failed'. `permanent=True` (e.g. a 404 audio URL, where
+    retrying can't help) fails it immediately. Returns the job's new status."""
     row = conn.execute(
         """
         UPDATE jobs
-        SET status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'queued' END,
-            run_after = CASE WHEN attempts >= max_attempts THEN run_after
+        SET status = CASE WHEN %(permanent)s OR attempts >= max_attempts THEN 'failed' ELSE 'queued' END,
+            run_after = CASE WHEN %(permanent)s OR attempts >= max_attempts THEN run_after
                              ELSE now() + make_interval(secs => %(base)s * power(2, attempts - 1))
                         END,
             last_error = %(error)s, locked_at = NULL, locked_by = NULL, updated_at = now()
-        WHERE id = %(id)s AND attempts = %(attempts)s AND status = 'running'
+        WHERE id = %(id)s AND lease = %(lease)s AND status = 'running'
         RETURNING status
         """,
-        {"base": BACKOFF_BASE_SECONDS, "error": error, "id": job.id, "attempts": job.attempts},
+        {"base": BACKOFF_BASE_SECONDS, "error": error, "id": job.id,
+         "lease": job.lease, "permanent": permanent},
     ).fetchone()
     if row is None:
-        raise LeaseLost(f"job {job.id} attempt {job.attempts} is no longer current")
+        raise LeaseLost(f"job {job.id} lease {job.lease} is no longer current")
     return row[0]
+
+
+def defer(conn: psycopg.Connection, job: Job, seconds: float, reason: str) -> None:
+    """Put a job back without counting this attempt: for throttling (429) or a
+    graceful shutdown, which aren't the job's fault. Runs again after `seconds`."""
+    row = conn.execute(
+        """
+        UPDATE jobs
+        SET status = 'queued', attempts = attempts - 1,
+            run_after = now() + make_interval(secs => %(seconds)s),
+            last_error = %(reason)s, locked_at = NULL, locked_by = NULL, updated_at = now()
+        WHERE id = %(id)s AND lease = %(lease)s AND status = 'running'
+        RETURNING id
+        """,
+        {"seconds": max(0.0, seconds), "reason": reason, "id": job.id, "lease": job.lease},
+    ).fetchone()
+    if row is None:
+        raise LeaseLost(f"job {job.id} lease {job.lease} is no longer current")
 
 
 def reclaim_stale(conn: psycopg.Connection, older_than: timedelta = STALE_AFTER) -> dict[str, int]:

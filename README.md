@@ -11,8 +11,9 @@ questions across many episodes at once. Every claim in an answer carries a
 > *"What do AI researchers say about scaling laws hitting a wall?"*
 > → An answer drawn from several episodes, with each claim linked to the moment it was said.
 
-**Status:** 🚧 In active development. Milestone 1 (ingestion and a crash-safe
-job queue) is complete; the speech pipeline is next. See [Roadmap](#roadmap).
+**Status:** 🚧 In active development. Ingestion, a crash-safe job queue and
+transcription with word-level timestamps are working end to end on real podcasts;
+transcription evaluation is next. See [Roadmap](#roadmap).
 
 ---
 
@@ -78,7 +79,7 @@ One kind of data flows through one straight pipeline: **audio → text → searc
 |---|---|---|
 | **M0** Setup | uv project, tests, secrets hygiene | ✅ Done |
 | **M1** Ingestion + queue | RSS ingestion, dedup, Postgres job queue (claim / retry / backoff / crash recovery) | ✅ Done |
-| **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | ⏳ Next |
+| **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | 🚧 Pipeline + worker done: WER eval remaining |
 | **M3** Enrichment | Ad detection, NER, chapters + summaries | Planned |
 | **M4** Retrieval | Hybrid BM25 + embeddings, reranker, retrieval evals | Planned |
 | **M5** Agents | Router, answerer with citations, deterministic critic | Planned |
@@ -122,17 +123,23 @@ docker compose up -d --wait      # start Postgres and wait until it's healthy
 ### Try it
 
 ```powershell
-uv run earshot ingest https://lexfridman.com/feed/podcast/ --limit 5
+uv run earshot ingest https://feeds.npr.org/510318/podcast.xml --limit 1
+uv run earshot worker --once
 uv run earshot status
 ```
 
 ```
-5 new episode(s) queued for transcription, 0 already known.
-episodes: 5
-jobs queued: 5
+1 new episode(s) queued for transcription, 0 already known.
+… INFO job 1: episode 1, attempt 1/3
+… INFO job 1: done (4 chunks sent, 0 from checkpoints)
+episodes: 1
+jobs done: 1
 ```
 
-Run the ingest command again and it reports `0 new … 5 already known`. That's idempotency.
+A 35-minute episode becomes about 6,000 words with word-level timestamps in about a
+minute. Run `ingest` again and it reports `0 new … 1 already known` (idempotency).
+Run `earshot worker` without `--once` to keep processing until you press Ctrl+C;
+an interrupted job is handed back to the queue immediately.
 
 ### Run the tests
 
@@ -158,11 +165,16 @@ uv run pytest -m live
 
 ```
 src/earshot/
-  cli.py          # `earshot ingest` / `earshot status`
+  cli.py          # `earshot ingest` / `earshot worker` / `earshot status`
   db.py           # connection (with timeout) and schema setup
   schema.sql      # episodes + jobs tables
   ingest.py       # RSS fetch → parse → dedup → save + enqueue
-  queue.py        # enqueue / claim (SKIP LOCKED) / complete / fail (backoff) / reclaim_stale
+  queue.py        # enqueue / claim (SKIP LOCKED) / complete / fail / defer / reclaim_stale
+  audio.py        # decode, Silero VAD, chunks cut in silences, FLAC encoding
+  transcribe.py   # Groq Whisper client (word timestamps, error classification)
+  pipeline.py     # checkpointed episode transcription (chunks table)
+  download.py     # streamed temp download with timeout and size cap
+  worker.py       # claim → download → transcribe → complete, failures routed
 tests/            # pytest suite + fixtures (sample RSS feed)
 docs/             # project plan and decisions
 docker-compose.yml  # local Postgres 17

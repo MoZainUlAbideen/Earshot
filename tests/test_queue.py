@@ -12,6 +12,7 @@ from earshot.queue import (
     LeaseLost,
     claim,
     complete,
+    defer,
     enqueue,
     fail,
     reclaim_stale,
@@ -260,3 +261,61 @@ def test_slow_worker_cannot_fail_a_reclaimed_job(db, make_episode):
     claim(db, "worker-fresh", KIND)
     with pytest.raises(LeaseLost):
         fail(db, slow, "timed out")
+
+# --- permanent failure -------------------------------------------------------
+
+def test_permanent_failure_skips_remaining_attempts(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    job = claim(db, "worker-1", KIND)
+    assert fail(db, job, "404: audio gone", permanent=True) == "failed"
+    assert claim(db, "worker-1", KIND) is None
+
+
+# --- defer: throttling / shutdown without spending an attempt ------------------
+
+def test_defer_requeues_later_and_refunds_the_attempt(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    job = claim(db, "worker-1", KIND)
+    defer(db, job, 45, "rate limited")
+    status, attempts, locked_by, _, last_error, delay = job_row(db, job.id)
+    assert (status, attempts, locked_by, last_error) == ("queued", 0, None, "rate limited")
+    assert delay == timedelta(seconds=45)
+    assert claim(db, "worker-1", KIND) is None  # not before run_after
+
+
+def test_endless_rate_limits_never_exhaust_attempts(db, make_episode):
+    job_id = enqueue(db, make_episode(), KIND)
+    for _ in range(10):  # far more than max_attempts
+        job = claim(db, "worker-1", KIND)
+        defer(db, job, 0, "rate limited")
+    assert job_row(db, job_id)[:2] == ("queued", 0)
+
+
+def test_lease_increases_on_every_claim_even_after_refunds(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    first = claim(db, "worker-1", KIND)
+    defer(db, first, 0, "rate limited")
+    second = claim(db, "worker-2", KIND)
+    assert second.attempts == first.attempts   # attempt was refunded...
+    assert second.lease > first.lease          # ...but the fencing token still moved on
+
+
+def test_stale_holder_is_fenced_out_after_a_refund(db, make_episode):
+    """The bug this design prevents: if attempts were the token, the refund would
+    make worker A's stale claim indistinguishable from worker B's live one."""
+    enqueue(db, make_episode(), KIND)
+    stale = claim(db, "worker-a", KIND)
+    defer(db, stale, 0, "rate limited")
+    live = claim(db, "worker-b", KIND)
+    with pytest.raises(LeaseLost):
+        complete(db, stale)
+    complete(db, live)
+    assert job_row(db, live.id)[0] == "done"
+
+
+def test_defer_rejects_a_job_that_is_not_current(db, make_episode):
+    enqueue(db, make_episode(), KIND)
+    job = claim(db, "worker-1", KIND)
+    complete(db, job)
+    with pytest.raises(LeaseLost):
+        defer(db, job, 0, "rate limited")
