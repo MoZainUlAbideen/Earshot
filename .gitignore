@@ -31,3 +31,5 @@ Thumbs.db
 
 # Cached raw eval transcripts (re-scoring without spending API quota)
 evals/cache/
+# Podcast eval clips, transcripts and references: copyrighted audio/text, local only
+evals/podcast/

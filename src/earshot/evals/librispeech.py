@@ -17,15 +17,15 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import jiwer
 import numpy as np
 import pyarrow.parquet as pq
 import soundfile as sf
 from huggingface_hub import hf_hub_download
 
-from earshot.audio import SAMPLE_RATE, Span, encode_flac, find_speech, plan_chunks
-import jiwer
-
+from earshot.audio import SAMPLE_RATE, Span
 from earshot.evals.wer import WerReport, normalize
+from earshot.pipeline import transcribe_audio
 from earshot.transcribe import Word, transcribe_chunk
 
 DATASET = "hf-internal-testing/librispeech_asr_dummy"
@@ -126,16 +126,6 @@ def score(samples: list[Sample], spans: list[Span], words: list[Word]) -> dict:
             "max_seconds_outside": round(offsets[-1], 3) if offsets else 0.0,
         },
     }
-
-
-def transcribe_audio(audio: np.ndarray, transcriber) -> tuple[list[Word], int]:
-    """VAD → chunks → transcriber, with words offset to absolute time. Returns (words, chunk count)."""
-    chunks = plan_chunks(find_speech(audio))
-    words: list[Word] = []
-    for span in chunks:
-        result = transcriber(encode_flac(audio, span))
-        words += [Word(w.text, span.start + w.start, span.start + w.end) for w in result.words]
-    return words, len(chunks)
 
 
 def run(model: str, transcriber=None, samples: list[Sample] | None = None,

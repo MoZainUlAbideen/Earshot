@@ -100,6 +100,25 @@ def transcribe_episode(
     return EpisodeResult(chunks_total=len(chunks), transcribed=transcribed, skipped=len(chunks) - transcribed)
 
 
+def transcribe_audio(
+    audio, transcriber: Transcriber, max_chunk_seconds: float | None = None
+) -> tuple[list[Word], int]:
+    """VAD → chunks → transcriber, with word times offset to absolute. No database,
+    no checkpoints: for evals and one-off clips. Returns (words, number of chunks).
+
+    Chunk size is a property of the backend: a transcriber may declare
+    `max_chunk_seconds` (e.g. a local model limited by RAM); otherwise the Groq-sized
+    default applies."""
+    if max_chunk_seconds is None:
+        max_chunk_seconds = getattr(transcriber, "max_chunk_seconds", MAX_CHUNK_SECONDS)
+    chunks = plan_chunks(find_speech(audio), max_seconds=max_chunk_seconds)
+    words: list[Word] = []
+    for span in chunks:
+        result = transcriber(encode_flac(audio, span))
+        words += [Word(w.text, span.start + w.start, span.start + w.end) for w in result.words]
+    return words, len(chunks)
+
+
 def get_transcript(conn: psycopg.Connection, episode_id: int) -> list[Word]:
     """The stitched transcript: every word with absolute timestamps, in time order."""
     words: list[Word] = []

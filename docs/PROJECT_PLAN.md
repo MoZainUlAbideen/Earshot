@@ -302,13 +302,49 @@ audio.
     eval decides. If they tie there too, use turbo for the paid batch (2.8×
     cheaper).
 
-**Current step: M2 step 5b/5c.**
-- 5b: hallucination signals per episode (near-zero word durations, backwards
-  timestamps, repeated n-grams), run on the NPR episode
-- 5c (needs Zain): hand-correct ~10 min of the NPR episode → podcast WER for
-  both models. Caveat: correcting a draft anchors the corrector toward it
-  (biases WER down); note it.
-- Then the M2 LEARNINGS entry and close M2.
+- [x] Step 5b, hallucination signals (`src/earshot/evals/signals.py`,
+  `earshot eval signals <episode_id>`): compressed runs (≥3 consecutive words
+  under 0.05 s), backward jumps (>0.5 s), and immediately repeated phrases of
+  ≥3 words. Thresholds come from data: clean LibriSpeech has 0 runs and
+  0 flags; NPR has 46 scattered short words (normal) and one run at the known
+  glitch. NPR result: 4 flags in 39 min. The known glitch at 14:57 is caught
+  twice. **Unverified:** 18:33 (likely a real human repetition, a false
+  positive) and 33:35 (compressed run).
+- [x] **Local fallback measured** (`src/earshot/local_asr.py`, faster-whisper,
+  int8, CPU). Word-perfect on the TTS fixture with small.en at 1.1× real time.
+  **On the real 10-min NPR clip, small.en could not run reliably on this
+  laptop:** only ~0.75 GB of RAM was free (Docker VM, VS Code, etc.), and
+  small.en commits ~2.5 GB at load. It failed 3 of 4 tries with
+  `mkl_malloc: failed to allocate memory`, plus one 183 MiB allocation failure
+  from computing features for a whole 600 s chunk at once. Fixes:
+  - **Chunk size is now per backend:** `LocalTranscriber.max_chunk_seconds = 120`
+    (RAM-bound), and Groq keeps 600 s (upload-bound). `transcribe_audio()`
+    reads it.
+  - **base.en works:** 600 s in 112 s (**5.4× real time**), peak 1.6 GB
+    committed. Groq: 10–11 s for the same clip (~55–60×).
+  - Conclusion: on this laptop the local fallback is viable with base.en (or
+    with more free RAM). Throughput 24/7 ≈ 130 audio-h/day, so capacity isn't
+    the issue; quality is (measure WER in 5c).
+- [x] Step 5c tooling (`src/earshot/evals/podcast.py`): `earshot eval
+  podcast-prepare <name> --episode-id N` cuts ONE fixed clip (so every model
+  and the human hear identical audio, despite DAI), transcribes it with both
+  Groq models and local small.en, and writes a draft `reference.txt` from the
+  **local** model (neutral, so correcting doesn't favour either Groq model).
+  It never overwrites an existing reference.txt. `earshot eval podcast <name>`
+  scores and warns if the reference is still the uncorrected draft. Clip,
+  transcripts and reference stay in `evals/podcast/` (gitignored, for
+  copyright); only metrics are committed.
+
+- [x] 5c prepared: `evals/podcast/npr-upfirst/` has clip.flac (600 s), cached
+  transcripts from large-v3, turbo and local base.en, and reference.txt (base.en
+  draft, 1,629 words). Preview vs the *uncorrected* draft (agreement, not
+  accuracy): turbo 5.0%, large-v3 8.3%. Check why large-v3 differs more once
+  the real reference exists.
+
+**Current step: M2 step 5c, waiting on Zain:** correct
+`evals/podcast/npr-upfirst/reference.txt` while listening to `clip.flac`, then
+run `uv run earshot eval podcast npr-upfirst`. Then write the M2 LEARNINGS
+entry, update the README results, and close M2.
 
 *Gotchas for the M2 LEARNINGS entry (plus the findings above):*
 - **Eval methodology bug (mine):** the first scoring assigned words to
@@ -322,6 +358,14 @@ audio.
   changes word counts. My test sentence hit it; the code was right.
 - Each scoring fix cost ~18 min of quota until raw transcripts were cached.
   Separate inference from scoring.
+- **A pipe hid a crash:** `cmd | grep ...` reported exit code 0 while Python
+  had crashed (a pipeline's status is the last command's). Capture `$?` from
+  the real command, or redirect to a file and grep afterwards.
+- **Out of memory loading small.en:** diagnosed by instrumenting the *real*
+  failing command with psutil (process committed and system available memory
+  at model load). A reconstruction didn't reproduce it, and my first ctypes
+  memory probe silently returned 0 MB, so I didn't trust it. The fix was in
+  design, not retries: per-backend chunk size, and a smaller local model.
 - `faster-whisper` 1.2.1 declares `av>=11` with no upper bound. uv installed
   av 19, which removed `av.open(metadata_errors=...)`, so we got a TypeError.
   Proved av 18.1.0 works in a throwaway overlay (`uv run --with`), then pinned

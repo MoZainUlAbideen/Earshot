@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from earshot.audio import SAMPLE_RATE, Span, load_audio
+from earshot import pipeline
 from earshot.evals import librispeech
 from earshot.evals.librispeech import Sample, join_samples, score
 from earshot.evals.wer import corpus_wer, normalize
@@ -115,7 +116,7 @@ def test_run_end_to_end_with_perfect_fake_transcriber(monkeypatch):
     _, spans = join_samples(samples)
 
     chunk_starts = []
-    real_encode = librispeech.encode_flac
+    real_encode = pipeline.encode_flac
 
     def spy_encode(audio, span):
         chunk_starts.append(span.start)
@@ -131,7 +132,7 @@ def test_run_end_to_end_with_perfect_fake_transcriber(monkeypatch):
                       for k, tok in enumerate(text.split())]
         return Transcription(" ".join(texts), words)
 
-    monkeypatch.setattr(librispeech, "encode_flac", spy_encode)
+    monkeypatch.setattr(pipeline, "encode_flac", spy_encode)
     result = librispeech.run("fake-model", transcriber=perfect, samples=samples, cache_dir=None)
 
     assert result["wer"] == 0.0
