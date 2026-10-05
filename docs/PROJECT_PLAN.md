@@ -193,18 +193,66 @@ podcasts.
 
 ## 9. Next step
 
-M2 step 1, speech pipeline planning (no code until the plan is agreed):
-- **Prerequisite (Zain):** a Groq API key in `.env` (`GROQ_API_KEY`)
-- **Check Groq's current audio rate limits and file-size limits** (section 6
-  requires this before M2). They decide chunk size and batch size, so document
-  the trade-off.
-- Audio handling: stream the episode to a temp file for processing and delete it
-  afterwards (never stored or served, consistent with the copyright constraint)
-- Pipeline: Silero VAD → chunks cut at silences → Whisper with word timestamps
-  → stitch chunks with correct time offsets
-- A worker loop: `reclaim_stale` → `claim('transcribe')` → process → `complete`
-  or `fail`. It must be idempotent, since delivery is at-least-once.
-- Eval: WER on a small LibriSpeech subset, plus ~10 minutes hand-corrected by Zain
+### M2 plan (agreed 2026-10-05)
+
+**Facts checked 2026-10-05:**
+- Groq free tier (both Whisper models): 20 RPM, 2,000 RPD, 7,200 audio-s/hour,
+  **28,800 audio-s/day (8 h of audio/day, the bottleneck)**, 25 MB per file,
+  10 s minimum billed.
+- Paid: large-v3 $0.111/h (WER 10.3%), turbo $0.04/h (WER 12%).
+- Groq key verified (HTTP 200 on /models).
+- Dev laptop: i7-8650U (4 cores), 8 GB RAM, no NVIDIA GPU, no system ffmpeg.
+
+**Trade-offs:**
+- **Budget:** 100 episodes × ~1.5 h ≈ 150 h ≈ 19 days on the free tier, or
+  about $6–17 paid. One Lex Fridman episode (5 h 22 m) uses 2/3 of a day's quota,
+  so pick curated shows with ~1 h episodes. Decide before the batch run.
+- **Local fallback (faster-whisper on CPU):** only a small model is practical,
+  so lower quality. It's a safety net, not the workhorse. Measure it.
+- **Model:** default `whisper-large-v3`; the WER eval compares it with turbo.
+
+**Design:** temp download → decode to 16 kHz mono → Silero VAD → group speech
+into ≤10-min chunks cut inside silences → FLAC (~10 MB < 25 MB) → Groq with
+word timestamps → offset by chunk start → stitched transcript → delete temp
+audio.
+- Library: `faster-whisper`, which bundles Silero VAD (ONNX, no torch),
+  PyAV decoding (no system ffmpeg) and the local fallback.
+- A `chunks` table checkpoints progress, so retries skip finished chunks
+  (idempotent under at-least-once delivery).
+- Rate limits: a 429 defers the job until `retry-after` **without consuming an
+  attempt** (it's not the episode's fault).
+
+**Steps:**
+1. VAD chunking (local, no API)
+2. Groq client and rate-limit handling
+3. `chunks` table and stitching
+4. Worker loop (`reclaim_stale` → claim → process → complete/fail/defer)
+5. WER eval (LibriSpeech subset plus ~10 min hand-corrected by Zain)
+
+**Progress:**
+- [x] Step 1: `src/earshot/audio.py`: `load_audio` (16 kHz mono), `find_speech`
+  (Silero VAD, 500 ms min silence, splits monologues at 600 s), `plan_chunks`
+  (≤600 s, cuts only in silence, skips silence between chunks), `encode_flac`.
+  TTS speech fixture (`tests/fixtures/speech_sample.flac`, 3 sentences with
+  3 s pauses). 57 tests passing, including a randomized invariant test.
+
+**Current step: M2 step 2, the Groq client.** Send one FLAC chunk, get words
+with timestamps. On 429, read `retry-after`. Use a timeout. Tests mock HTTP;
+one manual live call on the TTS fixture (we know the exact text).
+
+*Gotchas for the M2 LEARNINGS entry:*
+- `faster-whisper` 1.2.1 declares `av>=11` with no upper bound. uv installed
+  av 19, which removed `av.open(metadata_errors=...)`, so we got a TypeError.
+  Proved av 18.1.0 works in a throwaway overlay (`uv run --with`), then pinned
+  `av>=11,<19` with a comment. Lesson: open-ended dependency ranges break, so
+  lockfiles matter.
+- pytest's default traceback printed the full `DATABASE_URL` **including the
+  password** when Postgres was down. Reproduced with a fake password (1
+  occurrence with `--tb=auto`, 0 with `--tb=short`), then set
+  `addopts = "--tb=short"`. Matters because CI logs on a public repo are public.
+- Docker Desktop doesn't auto-start after a reboot. The DB tests failed fast
+  with "Can't reach Postgres" (the timeout guard worked). Fix: start Docker
+  Desktop, then `docker compose up -d --wait`.
 
 *Data note:* some real feeds omit `<itunes:duration>` (3 of the 5 Lex Fridman
 episodes), so `duration_seconds` can be NULL. M2 should measure it from the audio.

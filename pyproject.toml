@@ -8,10 +8,15 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    # Not imported directly: faster-whisper 1.2.1 calls av.open(metadata_errors=...),
+    # which av 19 removed. Drop this pin once faster-whisper supports av 19.
+    "av>=11,<19",
+    "faster-whisper>=1.2.1",
     "feedparser>=6.0.14",
     "httpx>=0.28.1",
     "psycopg[binary]>=3.3.6",
     "python-dotenv>=1.2.4",
+    "soundfile>=0.14.0",
 ]
 
 [project.scripts]
@@ -28,3 +33,6 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Short tracebacks: the default style prints function arguments, which leaked
+# DATABASE_URL (with password) when a connection failed. CI logs can be public.
+addopts = "--tb=short"
