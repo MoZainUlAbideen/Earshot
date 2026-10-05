@@ -71,6 +71,26 @@ One kind of data flows through one straight pipeline: **audio → text → searc
 | Retrieval | Recall@k, MRR, and **timestamp hit rate**: does the cited clip land within ±15 s of the true answer? |
 | Answers | Faithfulness and citation accuracy on a golden Q&A set |
 
+### Results so far
+
+**Transcription:** 73 LibriSpeech utterances (`hf-internal-testing/librispeech_asr_dummy`,
+1,169 words, ~9 min), joined with 1 s gaps and run through the full pipeline (VAD →
+chunks → Groq). Scoring is "align by text, then measure time", so timestamp error
+can't leak into WER. Measured 2026-10-05 ([raw results](evals/results/)).
+
+| Model | WER | Correct words timestamped inside their true utterance | Worst offset |
+|---|---|---|---|
+| `whisper-large-v3` | 2.65% | 99.1% | 1.35 s |
+| `whisper-large-v3-turbo` | 2.65% | 99.5% | 0.55 s |
+
+The two models tie on clean read speech. Conversational podcast audio (hand-corrected
+reference) is next and decides the default. Timestamps are far inside the ±15 s that
+citations need.
+
+```powershell
+uv run earshot eval librispeech --model whisper-large-v3
+```
+
 ---
 
 ## Roadmap
@@ -79,7 +99,7 @@ One kind of data flows through one straight pipeline: **audio → text → searc
 |---|---|---|
 | **M0** Setup | uv project, tests, secrets hygiene | ✅ Done |
 | **M1** Ingestion + queue | RSS ingestion, dedup, Postgres job queue (claim / retry / backoff / crash recovery) | ✅ Done |
-| **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | 🚧 Pipeline + worker done: WER eval remaining |
+| **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | 🚧 LibriSpeech eval done: podcast eval remaining |
 | **M3** Enrichment | Ad detection, NER, chapters + summaries | Planned |
 | **M4** Retrieval | Hybrid BM25 + embeddings, reranker, retrieval evals | Planned |
 | **M5** Agents | Router, answerer with citations, deterministic critic | Planned |
@@ -175,8 +195,10 @@ src/earshot/
   pipeline.py     # checkpointed episode transcription (chunks table)
   download.py     # streamed temp download with timeout and size cap
   worker.py       # claim → download → transcribe → complete, failures routed
+  evals/          # WER (Whisper normalizer) + LibriSpeech eval, align-by-text scoring
 tests/            # pytest suite + fixtures (sample RSS feed)
 docs/             # project plan and decisions
+evals/results/    # committed eval results (JSON)
 docker-compose.yml  # local Postgres 17
 LEARNINGS.md      # per-milestone log: what was built, what broke, how it was fixed
 ```

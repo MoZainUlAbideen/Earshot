@@ -1,0 +1,52 @@
+{
+  "dataset": "hf-internal-testing/librispeech_asr_dummy (73 utterances)",
+  "model": "whisper-large-v3-turbo",
+  "date": "2026-10-05",
+  "audio_seconds": 555.0,
+  "chunks": 1,
+  "seconds_elapsed": 0.0,
+  "wer": 0.0265,
+  "ref_words": 1169,
+  "substitutions": 27,
+  "deletions": 4,
+  "insertions": 0,
+  "words": 1143,
+  "timestamps": {
+    "correct_words_checked": 1138,
+    "inside_true_utterance_rate": 0.9947,
+    "p95_seconds_outside": 0.0,
+    "max_seconds_outside": 0.552
+  },
+  "worst_utterances": [
+    {
+      "id": "1272-135031-0016",
+      "wer": 0.5,
+      "ref": "kaliko hesitated",
+      "hyp": "calico hesitated"
+    },
+    {
+      "id": "1272-135031-0022",
+      "wer": 0.3333,
+      "ref": "true agreed kaliko",
+      "hyp": "true agreed calico"
+    },
+    {
+      "id": "1272-135031-0011",
+      "wer": 0.25,
+      "ref": "not exactly returned kaliko",
+      "hyp": "not exactly returned calico"
+    },
+    {
+      "id": "1272-141231-0024",
+      "wer": 0.1667,
+      "ref": "this is physically impossible when conscious",
+      "hyp": "this is physically impossible when unconscious"
+    },
+    {
+      "id": "1272-141231-0031",
+      "wer": 0.1111,
+      "ref": "a wave of despair rolled out from irolg brion sensed it and knew the 5th point was his",
+      "hyp": "a wave of despair rolled out from eirolg brienne sensed it and knew the 5th point was his"
+    }
+  ]
+}

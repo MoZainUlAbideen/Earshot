@@ -288,13 +288,40 @@ audio.
 - httpx logged full audio URLs (tracking IDs; private feeds carry tokens), so
   the CLI now sets the httpx logger to WARNING (tested).
 
-**Current step: M2 step 5, evaluation.**
-- WER on a small LibriSpeech subset (known ground truth), large-v3 vs turbo
-- ~10 min of real podcast audio hand-corrected by Zain → WER on real speech
-- Hallucination signals from the findings above, counted per episode
-- Results table in README; decide the default model from the data
+- [x] Step 5a, LibriSpeech eval (`src/earshot/evals/`): 73 utterances from
+  `hf-internal-testing/librispeech_asr_dummy` (1,169 words, 555 s), joined with
+  1 s gaps and run through the real pipeline. WER uses `whisper-normalizer`
+  (OpenAI's English normalizer). Scoring is **align by text, then measure time**.
+  Raw transcripts are cached in `evals/cache/` (gitignored), so re-scoring
+  costs no quota. CLI: `earshot eval librispeech --model …`. 126 tests passing.
+  **Results:**
+  - large-v3: 2.65% WER (S26 D5 I0); 99.1% of correct words inside their true
+    utterance; max offset 1.35 s
+  - turbo: 2.65% WER (S27 D4 I0); 99.5%; max 0.55 s
+  - **Decision:** keep large-v3 as the default (same free quota); the podcast
+    eval decides. If they tie there too, use turbo for the paid batch (2.8×
+    cheaper).
+
+**Current step: M2 step 5b/5c.**
+- 5b: hallucination signals per episode (near-zero word durations, backwards
+  timestamps, repeated n-grams), run on the NPR episode
+- 5c (needs Zain): hand-correct ~10 min of the NPR episode → podcast WER for
+  both models. Caveat: correcting a draft anchors the corrector toward it
+  (biases WER down); note it.
+- Then the M2 LEARNINGS entry and close M2.
 
 *Gotchas for the M2 LEARNINGS entry (plus the findings above):*
+- **Eval methodology bug (mine):** the first scoring assigned words to
+  utterances by timestamp. Whisper starts the first word after a pause ~0.2–0.55 s
+  early, so correct words became fake deletions, and "nearest utterance"
+  turned them into fake insertions. WER read 3.59%/3.17% and looked like turbo
+  was better; fair scoring gives 2.65%/2.65%. Fixed with align-by-text, then
+  measure time, plus a regression test. Lesson: don't let one metric's error
+  leak into another's.
+- `whisper-normalizer` merges counting words ("one two three" → "123"), which
+  changes word counts. My test sentence hit it; the code was right.
+- Each scoring fix cost ~18 min of quota until raw transcripts were cached.
+  Separate inference from scoring.
 - `faster-whisper` 1.2.1 declares `av>=11` with no upper bound. uv installed
   av 19, which removed `av.open(metadata_errors=...)`, so we got a TypeError.
   Proved av 18.1.0 works in a throwaway overlay (`uv run --with`), then pinned

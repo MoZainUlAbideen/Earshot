@@ -28,7 +28,10 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "jiwer>=4.0.0",
+    "pyarrow>=25.0.1",
     "pytest>=9.1.1",
+    "whisper-normalizer>=0.1.15",
 ]
 
 [tool.pytest.ini_options]
@@ -38,3 +41,5 @@ testpaths = ["tests"]
 # Live tests call real APIs (cost quota, need network): skipped unless `pytest -m live`.
 addopts = "--tb=short -m 'not live'"
 markers = ["live: calls a real external API; run explicitly with `pytest -m live`"]
+# whisper-normalizer has an invalid escape in a docstring; harmless, but noisy.
+filterwarnings = ["ignore::SyntaxWarning"]

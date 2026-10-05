@@ -1,0 +1,52 @@
+{
+  "dataset": "hf-internal-testing/librispeech_asr_dummy (73 utterances)",
+  "model": "whisper-large-v3",
+  "date": "2026-10-05",
+  "audio_seconds": 555.0,
+  "chunks": 1,
+  "seconds_elapsed": 8.9,
+  "wer": 0.0265,
+  "ref_words": 1169,
+  "substitutions": 26,
+  "deletions": 5,
+  "insertions": 0,
+  "words": 1142,
+  "timestamps": {
+    "correct_words_checked": 1138,
+    "inside_true_utterance_rate": 0.9912,
+    "p95_seconds_outside": 0.0,
+    "max_seconds_outside": 1.347
+  },
+  "worst_utterances": [
+    {
+      "id": "1272-135031-0016",
+      "wer": 0.5,
+      "ref": "kaliko hesitated",
+      "hyp": "calico hesitated"
+    },
+    {
+      "id": "1272-135031-0022",
+      "wer": 0.3333,
+      "ref": "true agreed kaliko",
+      "hyp": "true agreed calico"
+    },
+    {
+      "id": "1272-135031-0011",
+      "wer": 0.25,
+      "ref": "not exactly returned kaliko",
+      "hyp": "not exactly returned calico"
+    },
+    {
+      "id": "1272-141231-0031",
+      "wer": 0.1111,
+      "ref": "a wave of despair rolled out from irolg brion sensed it and knew the 5th point was his",
+      "hyp": "a wave of despair rolled out from irold brienne sensed it and knew the 5th point was his"
+    },
+    {
+      "id": "1272-141231-0004",
+      "wer": 0.1,
+      "ref": "one minute a voice said and the time buzzer sounded",
+      "hyp": "one minute a voice said and a time buzzer sounded"
+    }
+  ]
+}

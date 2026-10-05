@@ -1,4 +1,4 @@
-"""Command line: `earshot ingest <feed_url>`, `earshot worker`, `earshot status`."""
+"""Command line: `earshot ingest <feed_url>`, `earshot worker`, `earshot status`, `earshot eval ...`."""
 
 import argparse
 import logging
@@ -18,6 +18,18 @@ def cmd_worker(conn, args) -> None:
         run_worker(conn, args.id or default_worker_id(), once=args.once)
     except KeyboardInterrupt:
         print("worker stopped")
+
+
+def cmd_eval_librispeech(args) -> None:
+    from earshot.evals import librispeech  # dev-only dependencies, imported on demand
+
+    result = librispeech.run(args.model)
+    path = librispeech.save(result)
+    print(f"{result['model']}: WER {result['wer']:.2%} on {result['ref_words']} words "
+          f"(S={result['substitutions']} D={result['deletions']} I={result['insertions']}), "
+          f"correct words inside their utterance {result['timestamps']['inside_true_utterance_rate']:.2%} "
+          f"(p95 {result['timestamps']['p95_seconds_outside']:.2f}s, max {result['timestamps']['max_seconds_outside']:.2f}s outside), "
+          f"{result['audio_seconds']:.0f}s audio in {result['seconds_elapsed']:.0f}s -> {path}")
 
 
 def cmd_status(conn, args) -> None:
@@ -46,11 +58,20 @@ def main(argv: list[str] | None = None) -> None:
     p_status = sub.add_parser("status", help="show episode and job counts")
     p_status.set_defaults(func=cmd_status)
 
+    p_eval = sub.add_parser("eval", help="quality evaluations (dev dependencies)")
+    eval_sub = p_eval.add_subparsers(dest="eval_name", required=True)
+    p_libri = eval_sub.add_parser("librispeech", help="WER + timestamp accuracy on LibriSpeech")
+    p_libri.add_argument("--model", default="whisper-large-v3")
+    p_libri.set_defaults(func=cmd_eval_librispeech, needs_db=False)
+
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     # httpx logs full request URLs at INFO; feed/audio URLs can carry tracking IDs
     # or access tokens (private feeds), so keep them out of the logs.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    if not getattr(args, "needs_db", True):
+        args.func(args)
+        return
     with connect(autocommit=True) as conn:
         apply_schema(conn)  # idempotent, so safe on every run
         args.func(conn, args)
