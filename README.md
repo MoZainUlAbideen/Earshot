@@ -142,7 +142,15 @@ uv run pytest
 
 Tests run against a separate `earshot_test` database (created automatically), so they
 never touch your dev data. They include concurrency tests proving that parallel workers
-claim every job exactly once.
+claim every job exactly once. External APIs are mocked, so the default run needs no
+network and spends no quota.
+
+Contract tests against the real Groq API are skipped by default. They need
+`GROQ_API_KEY` and use a few seconds of audio quota:
+
+```powershell
+uv run pytest -m live
+```
 
 ---
 

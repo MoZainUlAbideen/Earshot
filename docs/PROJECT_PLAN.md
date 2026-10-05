@@ -236,9 +236,23 @@ audio.
   TTS speech fixture (`tests/fixtures/speech_sample.flac`, 3 sentences with
   3 s pauses). 57 tests passing, including a randomized invariant test.
 
-**Current step: M2 step 2, the Groq client.** Send one FLAC chunk, get words
-with timestamps. On 429, read `retry-after`. Use a timeout. Tests mock HTTP;
-one manual live call on the TTS fixture (we know the exact text).
+- [x] Step 2: `src/earshot/transcribe.py`: `transcribe_chunk` (verbose_json,
+  word timestamps, temperature 0, 120 s timeout). Errors: 429 → `RateLimited`
+  (`retry_after`); 5xx/network → `TranscriptionError(retryable=True)`; other
+  4xx → `retryable=False`. Errors never contain the key. 15 mocked tests
+  (`httpx.MockTransport`), plus a live contract test (`pytest -m live`, skipped
+  by default). Live result on the fixture: word-perfect, 1.1 s for 16 s of
+  audio, word times inside the VAD segments after the offset.
+
+**Current step: M2 step 3, the `chunks` table and stitching.**
+- A `chunks` table: `(episode_id, idx)` UNIQUE, `start_s`/`end_s`, status,
+  words as JSONB (times already absolute). It's the checkpoint, so retries skip
+  done chunks.
+- `transcribe_episode(conn, episode_id, audio_path)`: plan chunks → for each
+  chunk not done: transcribe, offset words by `chunk.start`, save.
+  Idempotent: re-running does no new API calls.
+- A stitched transcript = all words ordered by time. Store `duration_seconds`
+  measured from the audio.
 
 *Gotchas for the M2 LEARNINGS entry:*
 - `faster-whisper` 1.2.1 declares `av>=11` with no upper bound. uv installed

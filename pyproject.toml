@@ -35,4 +35,6 @@ dev = [
 testpaths = ["tests"]
 # Short tracebacks: the default style prints function arguments, which leaked
 # DATABASE_URL (with password) when a connection failed. CI logs can be public.
-addopts = "--tb=short"
+# Live tests call real APIs (cost quota, need network): skipped unless `pytest -m live`.
+addopts = "--tb=short -m 'not live'"
+markers = ["live: calls a real external API; run explicitly with `pytest -m live`"]
