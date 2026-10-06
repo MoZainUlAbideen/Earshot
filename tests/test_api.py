@@ -151,6 +151,9 @@ def test_proxy_header_is_only_trusted_when_configured(monkeypatch):
     ("198.51.100.7, 10.1.2.3", 2, "198.51.100.7"),            # proxy appended client, then itself
     ("6.6.6.6, 198.51.100.7, 10.1.2.3", 2, "198.51.100.7"),   # a forged leading entry is ignored
     ("198.51.100.7", 2, "198.51.100.7"),                      # fewer entries than hops: leftmost
+    # The real Render shape (measured via /whoami): client, Cloudflare, Render load balancer
+    ("198.51.100.7, 172.71.151.203, 10.30.107.46", 3, "198.51.100.7"),
+    ("6.6.6.6,198.51.100.7, 172.71.146.199, 10.26.159.23", 3, "198.51.100.7"),
 ])
 def test_client_is_counted_from_the_right_past_trusted_hops(monkeypatch, chain, hops, expected):
     monkeypatch.setenv("TRUST_PROXY", "1")

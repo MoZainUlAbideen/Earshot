@@ -16,8 +16,10 @@ services:
         sync: false
       - key: RERANK                # free tier has 0.1 CPU: cross-encoder off (see README results)
         value: "0"
-      - key: TRUST_PROXY           # use the proxy-appended X-Forwarded-For entry for rate limits
+      - key: TRUST_PROXY           # read the client IP from X-Forwarded-For for rate limits
         value: "1"
+      - key: TRUSTED_PROXY_HOPS    # measured with /whoami: client, Cloudflare, Render LB
+        value: "3"
       - key: ASKS_PER_HOUR
         value: "10"
       - key: DAILY_TOKEN_BUDGET
