@@ -1,0 +1,28 @@
+{
+  "eval": "podcast:npr-upfirst",
+  "model": "whisper-large-v3",
+  "reference_is_uncorrected_draft": true,
+  "reference_edits_from_draft": 5,
+  "wer": 0.0822,
+  "ref_words": 1630,
+  "substitutions": 48,
+  "deletions": 64,
+  "insertions": 22,
+  "top_substitutions": [
+    "inner -> itner (x3)",
+    "fokkenflick -> fokinflik (x2)",
+    "us -> s (x2)",
+    "miller -> meller (x2)",
+    "the -> a (x1)",
+    "multi -> multimillion (x1)",
+    "$1000000 -> dollar (x1)",
+    "fokkenflick -> falkenflick (x1)"
+  ],
+  "hallucination_signals": {
+    "compressed_run": 0,
+    "backward_jump": 0,
+    "repeated_phrase": 0
+  },
+  "seconds_elapsed": 10.2,
+  "speed_x_realtime": 58.8
+}

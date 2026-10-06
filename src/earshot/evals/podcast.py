@@ -32,6 +32,10 @@ from earshot.transcribe import Word, transcribe_chunk
 
 PODCAST_DIR = Path("evals/podcast")
 RESULTS_DIR = Path("evals/results")
+# If the human changed fewer than this share of the draft's words, the "reference" is
+# mostly the draft model's output: scores then measure agreement with that model,
+# not accuracy (anchoring bias). Real conversational speech needs far more fixes.
+MIN_CORRECTION_RATE = 0.01
 GROQ_MODELS = ["whisper-large-v3", "whisper-large-v3-turbo"]
 MARKER_EVERY_SECONDS = 30
 
@@ -142,7 +146,12 @@ def score(name: str, *, base_dir: Path = PODCAST_DIR, results_dir: Path | None =
     reference_path = folder / "reference.txt"
     reference = load_reference(reference_path)
     draft_path = folder / "reference_draft.txt"
-    uncorrected = draft_path.exists() and reference_path.read_text(encoding="utf-8") == draft_path.read_text(encoding="utf-8")
+    edits = 0
+    if draft_path.exists():
+        draft_report = corpus_wer([load_reference(draft_path)], [reference])
+        edits = draft_report.substitutions + draft_report.deletions + draft_report.insertions
+    correction_rate = edits / max(1, len(normalize(reference).split()))
+    uncorrected = draft_path.exists() and correction_rate < MIN_CORRECTION_RATE
 
     results = []
     for cache in sorted(folder.glob("*.words.json")):
@@ -156,6 +165,7 @@ def score(name: str, *, base_dir: Path = PODCAST_DIR, results_dir: Path | None =
             "eval": f"podcast:{name}",
             "model": model,
             "reference_is_uncorrected_draft": uncorrected,
+            "reference_edits_from_draft": edits,
             "wer": report.wer,
             "ref_words": report.ref_words,
             "substitutions": report.substitutions,

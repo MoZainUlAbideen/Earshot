@@ -1,0 +1,28 @@
+{
+  "eval": "podcast:npr-upfirst",
+  "model": "whisper-large-v3-turbo",
+  "reference_is_uncorrected_draft": true,
+  "reference_edits_from_draft": 5,
+  "wer": 0.0497,
+  "ref_words": 1630,
+  "substitutions": 33,
+  "deletions": 11,
+  "insertions": 37,
+  "top_substitutions": [
+    "inner -> itner (x3)",
+    "fokkenflick -> folkenflik (x2)",
+    "us -> s (x2)",
+    "miller -> meller (x2)",
+    "the -> a (x1)",
+    "fokkenflick -> folkenflick (x1)",
+    "keith -> kiev (x1)",
+    "here -> hear (x1)"
+  ],
+  "hallucination_signals": {
+    "compressed_run": 0,
+    "backward_jump": 2,
+    "repeated_phrase": 0
+  },
+  "seconds_elapsed": 10.7,
+  "speed_x_realtime": 56.1
+}

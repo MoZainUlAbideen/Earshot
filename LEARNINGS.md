@@ -130,3 +130,99 @@ plus a 60-second interview script.
 > bug was a test suite that hung: I found zero connections on the database side and traced it
 > to localhost resolving to IPv6, which Docker accepted but never answered. The fix was an
 > explicit IPv4 host plus a timeout on every network call."
+---
+
+## M2 — Speech pipeline (2026-10-04 → 2026-10-06)
+
+### What we built
+- **Audio prep** (`audio.py`): decode to 16 kHz mono → Silero VAD → chunks of ≤10 min
+  cut only in silences → FLAC. A 600 s chunk is 19.2 MB even uncompressed, so it fits
+  Groq's 25 MB cap *by construction*. Silence between chunks isn't sent, which saves
+  quota.
+- **Groq client** (`transcribe.py`): word timestamps, errors classified by whose fault
+  they are (429 → `RateLimited`; 5xx/network → retryable; other 4xx → permanent). The
+  key never appears in errors. Mocked tests, plus a live contract test (`pytest -m live`).
+- **Checkpointed transcription** (`pipeline.py`, `chunks` table): each finished chunk is
+  saved, so retries resume and duplicate runs make zero API calls. Checkpoints are tied
+  to the audio's sha256 *and* the chunk plan.
+- **Worker** (`worker.py`, `download.py`): streamed temp download (timeout, 400 MB cap,
+  always deleted). A 429 *defers* (attempt refunded) and pauses the whole worker
+  (quota is per account). Ctrl+C hands the job back. Fencing moved to a monotonic
+  `lease` column.
+- **Evals** (`evals/`): LibriSpeech WER + timestamp accuracy through the full pipeline;
+  hallucination signals; a podcast eval with a fixed clip and a neutral draft; a local
+  faster-whisper fallback.
+- **Model decision:** `whisper-large-v3-turbo` became the default, based on data (below).
+
+### Why (key decisions)
+- **Chunk size is a property of the backend,** not a global: Groq is upload-bound (600 s),
+  local is RAM-bound (120 s).
+- **"Align by text, then measure time":** WER and timestamp accuracy are measured
+  separately, so one metric's error can't leak into the other.
+- **Separate inference from scoring:** raw transcripts are cached, so scoring changes
+  cost no quota.
+- **Every model and the human hear one fixed clip:** dynamic ad insertion means a fresh
+  stream can differ.
+
+### What broke and how we fixed it
+1. **Dependency drift:** faster-whisper declares `av>=11` (no ceiling). uv installed av 19,
+   which removed an argument faster-whisper uses → `TypeError`. Proved av 18.1.0 works in
+   a throwaway overlay (`uv run --with`), then pinned `av<19` with a comment saying why.
+2. **Password in test output:** pytest's default tracebacks print function arguments,
+   including the full `DATABASE_URL`. Reproduced with a fake password (shown once by
+   default, zero times with `--tb=short`), then made `--tb=short` the default. CI logs on
+   public repos are public.
+3. **My own fencing flaw:** `defer` refunds `attempts`, but `attempts` was also the fencing
+   token, so a stale claim could carry the same token as the live one. Fix: a separate
+   `lease` counter that only increases. Mutation-tested (the old fence makes exactly the
+   refund-scenario test fail).
+4. **Dynamic ad insertion, measured:** the feed declared 2,115 s, and we measured 2,318 s
+   (+203 s, matching +3.2 MB in `x-total-bytes`). Downloads differ per listener.
+5. **Whisper glitches found on real data:** a duplicated phrase with 0.02 s word durations
+   at 14:57. Stored raw; this led to the hallucination-signal detectors (they caught it
+   twice, and raised 0 flags on clean audio).
+6. **Logs leaked URLs:** httpx logs full request URLs, and private feeds can carry tokens.
+   Set the httpx logger to WARNING (tested).
+7. **My eval methodology bug:** I first assigned words to utterances by *timestamp*.
+   Whisper timestamps the first word after a pause 0.2–0.55 s early, so correct words
+   became fake deletions, and "nearest utterance" then made fake insertions. That read
+   3.59% vs 3.17% and suggested turbo was better. Fair scoring: **2.65% vs 2.65%**.
+8. **A pipe hid a crash:** `cmd | grep` reported success while Python had crashed (a
+   pipeline's exit code is the last command's).
+9. **Out of memory on the local model:** the laptop had ~0.75 GB free, and small.en
+   commits ~2.5 GB at load. Diagnosed by instrumenting the *real* command with psutil (a
+   reconstruction didn't reproduce it, and my first ctypes probe silently returned 0 MB).
+   The fix was design, not retries: per-backend chunk size and base.en (5.4× real time,
+   1.6 GB peak).
+10. **Anchoring bias, demonstrated:** the hand-corrected podcast reference differed from
+    the base.en draft by only 5 of 1,629 words, so the "results" measured agreement with
+    base.en (which "scored" 0.31%). Added a guard: if <1% of words changed, the score is
+    flagged as agreement, not accuracy.
+11. **What the podcast eval did reveal, without a good reference:** comparing large-v3
+    with turbo directly, 68 of large-v3's 70 "missing" words were **one ad passage it
+    silently skipped**. On content, the models agree. Accidental omission is the risk, so
+    ad removal should be explicit (M3).
+12. **Tooling lesson (mine, twice):** patching code with `sed` or ad-hoc scripts
+    corrupted `\n`/`\r\n` escapes into real line breaks. Use exact-match edits.
+
+### Results
+| | WER (LibriSpeech, 1,169 words) | Timestamp: correct words inside true utterance | Speed |
+|---|---|---|---|
+| Groq large-v3 | 2.65% | 99.1% (max 1.35 s off) | ~59× real time |
+| Groq large-v3-turbo (**default**) | 2.65% | 99.5% (max 0.55 s off) | ~56× real time |
+| Local base.en (CPU fallback) | not measured (no unbiased podcast reference) | n/a | 5.4× real time |
+
+### 60-second interview script
+> "Earshot's speech pipeline downloads each episode to a temp file, uses voice activity
+> detection to cut it into chunks of up to ten minutes, always in silence so no word is split,
+> and sends each chunk to Whisper on Groq for word-level timestamps. Each finished chunk is
+> checkpointed, so a rate limit or crash resumes where it stopped and never re-pays for audio,
+> and checkpoints are tied to a hash of the exact audio, because podcast hosts insert different
+> ads into every download. I measured that: 203 extra seconds on one episode. The worker sorts
+> failures by whose fault they are: rate limits defer the job without spending an attempt,
+> transient errors back off, permanent ones fail fast. I chose the model with an eval through the
+> full pipeline, and my first version had a methodology bug: I grouped words by timestamp, so
+> timing jitter showed up as recognition errors and pointed at the wrong model. Aligning by text
+> first, then measuring time, showed a tie at 2.65% WER. The tiebreaker was that large-v3 silently
+> skipped a 68-word passage that turbo kept, so I chose turbo: same accuracy, tighter timestamps,
+> 2.8 times cheaper, and nothing gets dropped by accident."

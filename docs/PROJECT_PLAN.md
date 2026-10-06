@@ -79,6 +79,12 @@ Podcast Index API / RSS feed
 - **Local Postgres:** runs in Docker Desktop via `docker-compose.yml`, the same
   image CI and Render will use (dev/prod parity). Chosen over hosted Neon (needs
   internet, shared state in tests) and a native install (no CI parity).
+- **Milestone order (decided 2026-10-06): MVP path first:** M4 retrieval → M5
+  answering → M6 live product, pulling in only a simple ad filter from M3. Full
+  enrichment (NER, chapters) and M7 polish come after a working, demo-able app.
+- **Default ASR model: `whisper-large-v3-turbo`** (see the M2 eval log).
+- **First corpus:** Practical AI (8 recent episodes, ~48 min each; Zain's pick)
+  plus the NPR episode as an off-topic distractor.
 - **Ingestion source:** RSS feeds directly (no API key, the original source).
   Podcast Index is used later for *discovery* (search for shows → feed URLs).
 - **ASR:** Groq's Whisper API (free tier, rate-limited), with local
@@ -199,9 +205,9 @@ podcasts.
       46 tests passing; fencing mutation-tested.
 - [x] **M1 complete**: LEARNINGS.md entry written, README roadmap updated
 
-## 9. Next step
+### M2 log (plan, progress, findings)
 
-### M2 plan (agreed 2026-10-05)
+#### M2 plan (agreed 2026-10-05)
 
 **Facts checked 2026-10-05:**
 - Groq free tier (both Whisper models): 20 RPM, 2,000 RPD, 7,200 audio-s/hour,
@@ -341,49 +347,46 @@ audio.
   accuracy): turbo 5.0%, large-v3 8.3%. Check why large-v3 differs more once
   the real reference exists.
 
-**Current step: M2 step 5c, waiting on Zain:** correct
-`evals/podcast/npr-upfirst/reference.txt` while listening to `clip.flac`, then
-run `uv run earshot eval podcast npr-upfirst`. Then write the M2 LEARNINGS
-entry, update the README results, and close M2.
+- [x] 5c result: the reference differed from the base.en draft by only 5 of 1,629
+  words (anchoring bias), so podcast WER = agreement with base.en, not accuracy.
+  A guard now flags references with <1% of words changed. A direct large-v3 vs
+  turbo comparison (no reference needed) found **68 of large-v3's 70 "missing"
+  words were one ad passage it silently skipped** (1:57–2:20). On content, the
+  models agree.
+- [x] **Default model → `whisper-large-v3-turbo`** (tie on WER; tighter
+  timestamps; 2.8× cheaper paid; no silent skipping).
+- [x] **M2 complete**: LEARNINGS.md entry written, README results + roadmap
+  updated. 141 tests passing.
 
-*Gotchas for the M2 LEARNINGS entry (plus the findings above):*
-- **Eval methodology bug (mine):** the first scoring assigned words to
-  utterances by timestamp. Whisper starts the first word after a pause ~0.2–0.55 s
-  early, so correct words became fake deletions, and "nearest utterance"
-  turned them into fake insertions. WER read 3.59%/3.17% and looked like turbo
-  was better; fair scoring gives 2.65%/2.65%. Fixed with align-by-text, then
-  measure time, plus a regression test. Lesson: don't let one metric's error
-  leak into another's.
-- `whisper-normalizer` merges counting words ("one two three" → "123"), which
-  changes word counts. My test sentence hit it; the code was right.
-- Each scoring fix cost ~18 min of quota until raw transcripts were cached.
-  Separate inference from scoring.
-- **A pipe hid a crash:** `cmd | grep ...` reported exit code 0 while Python
-  had crashed (a pipeline's status is the last command's). Capture `$?` from
-  the real command, or redirect to a file and grep afterwards.
-- **Out of memory loading small.en:** diagnosed by instrumenting the *real*
-  failing command with psutil (process committed and system available memory
-  at model load). A reconstruction didn't reproduce it, and my first ctypes
-  memory probe silently returned 0 MB, so I didn't trust it. The fix was in
-  design, not retries: per-backend chunk size, and a smaller local model.
-- `faster-whisper` 1.2.1 declares `av>=11` with no upper bound. uv installed
-  av 19, which removed `av.open(metadata_errors=...)`, so we got a TypeError.
-  Proved av 18.1.0 works in a throwaway overlay (`uv run --with`), then pinned
-  `av>=11,<19` with a comment. Lesson: open-ended dependency ranges break, so
-  lockfiles matter.
-- pytest's default traceback printed the full `DATABASE_URL` **including the
-  password** when Postgres was down. Reproduced with a fake password (1
-  occurrence with `--tb=auto`, 0 with `--tb=short`), then set
-  `addopts = "--tb=short"`. Matters because CI logs on a public repo are public.
-- Docker Desktop doesn't auto-start after a reboot. The DB tests failed fast
-  with "Can't reach Postgres" (the timeout guard worked). Fix: start Docker
-  Desktop, then `docker compose up -d --wait`.
+## 9. Next step
 
-*Data note:* some real feeds omit `<itunes:duration>` (3 of the 5 Lex Fridman
-episodes), so `duration_seconds` can be NULL. M2 should measure it from the audio.
+### M4 plan: retrieval (agreed 2026-10-06)
+- **Passages:** ~45 s windows, 15 s overlap (stride 30 s), snapped to word
+  boundaries. An answer on a boundary lands whole in some window; 45 s ≈ 110
+  words is a complete thought with a precise citation time.
+- **Keyword leg:** Postgres full-text (`tsvector` GENERATED column + GIN,
+  `websearch_to_tsquery`, `ts_rank_cd`). Note: `ts_rank_cd` isn't true BM25
+  (no IDF); switch only if the eval shows keyword search is weak.
+- **Semantic leg:** `fastembed` `BAAI/bge-small-en-v1.5` (384-d, ONNX, no torch),
+  stored in **pgvector** (HNSW, cosine). Image → `pgvector/pgvector:pg17` (same
+  PG 17 data dir). Store the embedding model name per row (versioning, M7).
+- **Fusion:** Reciprocal Rank Fusion, k = 60 (rank-based, so no score
+  calibration needed).
+- **Rerank:** `fastembed` cross-encoder `Xenova/ms-marco-MiniLM-L-6-v2` on the
+  top 20.
+- **Eval:** golden questions with known answer times (LLM-generated paraphrased
+  questions from passages, plus a few by hand) → recall@k, MRR, timestamp hit
+  rate (±15 s), for keyword / vector / hybrid / hybrid + rerank.
+- **Indexing** runs on demand: `earshot index` (idempotent; episodes with a
+  transcript but no passages). Later it can become a queue job kind.
 
-*Dev notes:*
-- In Windows PowerShell 5.1, `docker compose exec ... -c "..."` mangles nested
-  quotes. Use Git Bash for one-off `psql` commands.
-- `DATABASE_URL` must use `127.0.0.1`, not `localhost` (IPv6 hang; see the M1
-  entry in LEARNINGS.md).
+**Steps:** 1 passages (pure) → 2 pgvector + passages table + `earshot index`
+→ 3 embeddings → 4 keyword + vector + RRF search, `earshot search` → 5 reranker
+→ 6 golden set + retrieval eval.
+
+**In progress:** corpus batch 1 (8 Practical AI episodes) transcribing in the
+background: `earshot worker --until-empty` (new flag: exits when no work is
+left, but waits out rate-limit deferrals). Groq free tier allows 2 audio-h per
+hour, so expect 429 deferrals.
+
+**Current step: M4 step 1, passages.**

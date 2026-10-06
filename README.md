@@ -11,9 +11,9 @@ questions across many episodes at once. Every claim in an answer carries a
 > *"What do AI researchers say about scaling laws hitting a wall?"*
 > → An answer drawn from several episodes, with each claim linked to the moment it was said.
 
-**Status:** 🚧 In active development. Ingestion, a crash-safe job queue and
-transcription with word-level timestamps are working end to end on real podcasts;
-transcription evaluation is next. See [Roadmap](#roadmap).
+**Status:** 🚧 In active development. Milestones 1–2 are complete: ingestion, a
+crash-safe job queue, and transcription with word-level timestamps, evaluated end to
+end on real podcasts. Search is next. See [Roadmap](#roadmap).
 
 ---
 
@@ -83,9 +83,16 @@ can't leak into WER. Measured 2026-10-05 ([raw results](evals/results/)).
 | `whisper-large-v3` | 2.65% | 99.1% | 1.35 s |
 | `whisper-large-v3-turbo` | 2.65% | 99.5% | 0.55 s |
 
-The two models tie on clean read speech. Conversational podcast audio (hand-corrected
-reference) is next and decides the default. Timestamps are far inside the ±15 s that
+The two models tie on clean read speech. On a real NPR episode they also agree on the
+content, but `large-v3` **silently skipped a 68-word ad passage** that turbo kept. An
+accidental omission could just as well drop real content, so **`whisper-large-v3-turbo` is the
+default**: same accuracy, tighter timestamps, 2.8× cheaper on the paid tier. Ad removal is
+an explicit step (enrichment), not luck. Timestamps are far inside the ±15 s that
 citations need.
+
+The podcast eval also exposed **anchoring bias**: a hand-corrected reference that started
+from a model's draft kept 99.7% of the draft, so it measured agreement with that model, not
+accuracy. The scorer now flags any reference that changed less than 1% of the draft.
 
 ```powershell
 uv run earshot eval librispeech --model whisper-large-v3
@@ -99,7 +106,7 @@ uv run earshot eval librispeech --model whisper-large-v3
 |---|---|---|
 | **M0** Setup | uv project, tests, secrets hygiene | ✅ Done |
 | **M1** Ingestion + queue | RSS ingestion, dedup, Postgres job queue (claim / retry / backoff / crash recovery) | ✅ Done |
-| **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | 🚧 LibriSpeech eval done: podcast eval remaining |
+| **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | ✅ Done |
 | **M3** Enrichment | Ad detection, NER, chapters + summaries | Planned |
 | **M4** Retrieval | Hybrid BM25 + embeddings, reranker, retrieval evals | Planned |
 | **M5** Agents | Router, answerer with citations, deterministic critic | Planned |

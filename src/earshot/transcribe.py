@@ -14,7 +14,11 @@ import httpx
 from dotenv import load_dotenv
 
 GROQ_TRANSCRIBE_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
-DEFAULT_MODEL = "whisper-large-v3"
+# Chosen by eval (2026-10-06): turbo tied large-v3 on LibriSpeech (2.65% WER each) and on
+# podcast content, has tighter timestamps (max 0.55 s vs 1.35 s off), is 2.8x cheaper on
+# the paid tier, and transcribes everything. large-v3 silently skipped a 68-word ad
+# passage on NPR, which could just as well have been real content.
+DEFAULT_MODEL = "whisper-large-v3-turbo"
 DEFAULT_RETRY_AFTER_SECONDS = 60.0
 TIMEOUT = httpx.Timeout(120.0, connect=10.0)  # 10 MB upload + transcription takes a while
 

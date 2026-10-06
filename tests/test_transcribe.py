@@ -57,7 +57,8 @@ def test_request_has_the_right_shape():
     run(fake_client(handler))
     assert seen["url"] == GROQ_TRANSCRIBE_URL
     assert seen["auth"] == f"Bearer {FAKE_KEY}"
-    for expected in [b"whisper-large-v3", b"verbose_json", b"timestamp_granularities[]",
+    model_field = f'name="model"\r\n\r\n{transcribe.DEFAULT_MODEL}\r\n'.encode()  # exact value, not a prefix
+    for expected in [model_field, b"verbose_json", b"timestamp_granularities[]",
                      b"word", FLAC, b'filename="chunk.flac"']:
         assert expected in seen["body"]
 

@@ -185,3 +185,21 @@ def test_worker_pauses_for_rate_limit_and_idles_when_empty(db, queued_job, monke
                downloader=FakeDownloader(), transcriber=FakeTranscriber(RateLimited(retry_after=42)))
     # iteration 1: 429 -> pause 42s; iteration 2: job not ready yet -> idle 7s
     assert sleeps == [42, 7]
+
+
+def test_until_empty_drains_the_queue_then_exits(db, make_episode, monkeypatch):
+    monkeypatch.setattr(worker.time, "sleep", lambda s: None)
+    ids = [enqueue(db, make_episode(), TRANSCRIBE) for _ in range(3)]
+    run_worker(db, "worker-1", until_empty=True, max_iterations=10,
+               downloader=FakeDownloader(), transcriber=FakeTranscriber())
+    assert [job_state(db, i)[0] for i in ids] == ["done", "done", "done"]
+
+
+def test_until_empty_waits_for_deferred_jobs_instead_of_quitting(db, queued_job, monkeypatch):
+    """A rate-limited job is deferred (queued, run_after in the future): that's work left."""
+    sleeps = []
+    monkeypatch.setattr(worker.time, "sleep", sleeps.append)
+    run_worker(db, "worker-1", until_empty=True, max_iterations=3, idle_sleep=7,
+               downloader=FakeDownloader(), transcriber=FakeTranscriber(RateLimited(retry_after=42)))
+    assert sleeps == [42, 7, 7]  # kept waiting; never exited on the deferred job
+    assert job_state(db, queued_job)[0] == "queued"

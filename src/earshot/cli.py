@@ -5,6 +5,7 @@ import logging
 
 from earshot.db import apply_schema, connect
 from earshot.ingest import ingest_feed
+from earshot.transcribe import DEFAULT_MODEL
 from earshot.worker import default_worker_id, run_worker
 
 
@@ -15,7 +16,7 @@ def cmd_ingest(conn, args) -> None:
 
 def cmd_worker(conn, args) -> None:
     try:
-        run_worker(conn, args.id or default_worker_id(), once=args.once)
+        run_worker(conn, args.id or default_worker_id(), once=args.once, until_empty=args.until_empty)
     except KeyboardInterrupt:
         print("worker stopped")
 
@@ -62,7 +63,8 @@ def cmd_eval_podcast(args) -> None:
     from earshot.evals import podcast
 
     for r in podcast.score(args.name):
-        flag = "  [WARNING: reference not corrected yet]" if r["reference_is_uncorrected_draft"] else ""
+        flag = (f"  [WARNING: reference differs from the draft by only {r['reference_edits_from_draft']} words; "
+                "scores measure agreement with the draft model, not accuracy]") if r["reference_is_uncorrected_draft"] else ""
         print(f"{r['model']}: WER {r['wer']:.2%} on {r['ref_words']} words "
               f"(S={r['substitutions']} D={r['deletions']} I={r['insertions']}), "
               f"{r['speed_x_realtime']}x real time{flag}")
@@ -88,6 +90,8 @@ def main(argv: list[str] | None = None) -> None:
 
     p_worker = sub.add_parser("worker", help="transcribe queued episodes (Ctrl+C to stop)")
     p_worker.add_argument("--once", action="store_true", help="process at most one job, then exit")
+    p_worker.add_argument("--until-empty", action="store_true",
+                          help="exit when no work is left (waits out rate-limit deferrals)")
     p_worker.add_argument("--id", help="worker name (default: hostname-pid)")
     p_worker.set_defaults(func=cmd_worker)
 
@@ -97,7 +101,7 @@ def main(argv: list[str] | None = None) -> None:
     p_eval = sub.add_parser("eval", help="quality evaluations (dev dependencies)")
     eval_sub = p_eval.add_subparsers(dest="eval_name", required=True)
     p_libri = eval_sub.add_parser("librispeech", help="WER + timestamp accuracy on LibriSpeech")
-    p_libri.add_argument("--model", default="whisper-large-v3")
+    p_libri.add_argument("--model", default=DEFAULT_MODEL)
     p_libri.set_defaults(func=cmd_eval_librispeech, needs_db=False)
     p_signals = eval_sub.add_parser("signals", help="hallucination signals for a transcribed episode")
     p_signals.add_argument("episode_id", type=int)

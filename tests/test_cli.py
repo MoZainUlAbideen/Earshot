@@ -15,7 +15,7 @@ def test_worker_command_runs_the_worker_and_quiets_httpx(monkeypatch):
     calls = {}
     monkeypatch.setattr(cli, "connect", fake_connect)
     monkeypatch.setattr(cli, "apply_schema", lambda conn: None)
-    monkeypatch.setattr(cli, "run_worker", lambda conn, worker_id, once: calls.update(id=worker_id, once=once))
+    monkeypatch.setattr(cli, "run_worker", lambda conn, worker_id, once, until_empty: calls.update(id=worker_id, once=once))
 
     cli.main(["worker", "--once", "--id", "w-test"])
 

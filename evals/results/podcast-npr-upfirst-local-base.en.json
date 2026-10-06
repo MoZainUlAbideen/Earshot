@@ -1,0 +1,22 @@
+{
+  "eval": "podcast:npr-upfirst",
+  "model": "local-base.en",
+  "reference_is_uncorrected_draft": true,
+  "reference_edits_from_draft": 5,
+  "wer": 0.0031,
+  "ref_words": 1630,
+  "substitutions": 2,
+  "deletions": 2,
+  "insertions": 1,
+  "top_substitutions": [
+    "ayesha -> aisha (x1)",
+    "globe -> globetrotting (x1)"
+  ],
+  "hallucination_signals": {
+    "compressed_run": 0,
+    "backward_jump": 0,
+    "repeated_phrase": 0
+  },
+  "seconds_elapsed": 111.6,
+  "speed_x_realtime": 5.4
+}

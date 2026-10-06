@@ -79,3 +79,18 @@ def test_score_warns_when_reference_was_never_corrected(tmp_path, monkeypatch):
     prepare("ep", "https://x/ep.mp3", local_model="draft", base_dir=tmp_path, transcribers=TRANSCRIBERS, downloader=fixture_downloader)
     results = score("ep", base_dir=tmp_path, results_dir=None)
     assert all(r["reference_is_uncorrected_draft"] for r in results)
+
+
+def test_barely_corrected_reference_is_flagged_as_anchored(tmp_path):
+    """Regression: a reference that keeps 99%+ of the draft measures agreement with
+    the draft model, not accuracy, even if the human did change a few words."""
+    long_truth = " ".join(["word"] * 300)
+    transcribers = {"local-draft": fake(long_truth), "model-a": fake(long_truth)}
+    prepare("ep", "https://x/ep.mp3", local_model="draft", base_dir=tmp_path,
+            transcribers=transcribers, downloader=fixture_downloader)
+    ref = tmp_path / "ep" / "reference.txt"
+    ref.write_text(ref.read_text(encoding="utf-8") + "fixed fixed\n", encoding="utf-8")  # 2 inserted words
+
+    result = score("ep", base_dir=tmp_path, results_dir=None)[0]
+    assert result["reference_edits_from_draft"] == 2
+    assert result["reference_is_uncorrected_draft"] is True  # 2/300 < 1%

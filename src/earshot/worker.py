@@ -98,16 +98,27 @@ def _run(conn, job: Job, transcriber, downloader) -> Outcome:
         return Outcome("failed" if status == "failed" else "retrying", job.id)
 
 
+def unfinished_jobs(conn: psycopg.Connection) -> int:
+    """Jobs that still have work ahead: queued (incl. deferred to a later run_after) or running."""
+    return conn.execute(
+        "SELECT count(*) FROM jobs WHERE kind = %s AND status IN ('queued', 'running')", (TRANSCRIBE,)
+    ).fetchone()[0]
+
+
 def run_worker(
     conn: psycopg.Connection,
     worker_id: str,
     *,
     once: bool = False,
+    until_empty: bool = False,
     idle_sleep: float = IDLE_SLEEP_SECONDS,
     max_iterations: int | None = None,
     **kwargs,
 ) -> None:
-    """Loop over jobs until interrupted. `once`: process at most one job, then return."""
+    """Loop over jobs until interrupted.
+    `once`: process at most one job, then return.
+    `until_empty`: return when no job is left to do. Deferred (rate-limited) jobs still
+    count as work left, so the worker waits for them rather than quitting early."""
     log.info("worker %s started", worker_id)
     iterations = 0
     while max_iterations is None or iterations < max_iterations:
@@ -116,6 +127,9 @@ def run_worker(
         if once:
             return
         if outcome is None:
+            if until_empty and unfinished_jobs(conn) == 0:
+                log.info("queue drained; worker %s exiting", worker_id)
+                return
             time.sleep(idle_sleep)
         elif outcome.wait:
             log.info("pausing %.0fs for the rate limit", outcome.wait)
