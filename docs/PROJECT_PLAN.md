@@ -521,10 +521,26 @@ audio.
 - The first image was **2.49 GB** (uv cache baked into a layer) and C: fell to
   0.8 GB again → BuildKit cache mount. **Docker's disk must move to D:.**
 
-**Next (needs Zain):**
-1. Docker Desktop → Settings → Resources → Advanced → Disk image location → D:.
-2. Create a Neon project (region AWS us-west-2, Oregon) and put its **direct**
-   (not `-pooler`) connection string in `.env` as `NEON_DATABASE_URL`. Direct,
-   because psycopg prepares statements and the API has its own pool.
-3. Then: copy the data to Neon (pg_dump → pg_restore), deploy the Render
-   Blueprint, then the Next.js frontend on Vercel.
+- [x] Docker's disk moved to D: (Zain). C: free 0.8 → 7.5 GB; all local rows intact.
+- [x] **CI fix:** the first run failed: `astral-sh/setup-uv@v10` doesn't exist (the
+  project publishes no floating major tag; `v10.2.0` does). I had checked that the
+  *release* existed, not the *tag I referenced*. Pinned exact versions.
+- [x] **Neon:** project in AWS us-west-2, direct (non-pooler) URL in `.env` as
+  `NEON_DATABASE_URL`; verified with a masked host, TLS required, pgvector 0.8.6.
+  **Neon runs PostgreSQL 18.6** (local/CI 17), a dev/prod parity gap to close later
+  (pgvector `0.8.x-pg18-trixie` image).
+- [x] **Data copied** with `earshot copy-data --to-env NEON_DATABASE_URL`
+  (`transfer.py`): our own schema on the target (not pg_dump: the dump tools should
+  match the newer server), COPY in FK order with ids kept, generated `tsv`
+  recomputed, identity counters reset (mutation-tested: without it, the first new
+  row hit a duplicate primary key), refuses a non-empty target, and verifies
+  **row counts + content checksums** per table: 9/9/50/875 all ✓, embeddings too.
+- [x] The API run locally against Neon: health ok, AGENTS.md → 26:44, 9 episodes.
+- **Gotcha:** loading `.env` with `. ./.env` in bash broke the Neon URL: its `&`
+  is a bash control operator. A `.env` file isn't a shell script; use
+  python-dotenv (or `uv run --env-file`).
+
+**Next:** Render Blueprint deploy (Zain, dashboard), check the live /health, then
+verify TRUST_PROXY/X-Forwarded-For behaviour on Render; then the Next.js frontend on
+Vercel (with a "waking up the server" state for the ~1 min cold start), then set
+ALLOWED_ORIGINS to the Vercel URL.

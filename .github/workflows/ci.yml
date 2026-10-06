@@ -27,8 +27,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://earshot:ci-throwaway-password@127.0.0.1:5432/earshot
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      # Exact versions: setup-uv publishes no floating major tag (v10 doesn't exist, v10.2.0 does).
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
       - name: Install (fails if uv.lock is out of date)

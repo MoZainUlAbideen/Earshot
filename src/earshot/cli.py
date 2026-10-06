@@ -156,6 +156,23 @@ def cmd_eval_answers(conn, args) -> None:
     print(f"-> {path}")
 
 
+def cmd_copy_data(conn, args) -> None:
+    import os
+
+    from psycopg.conninfo import conninfo_to_dict
+
+    from earshot.transfer import copy_all
+
+    target_url = os.environ.get(args.to_env)
+    if not target_url:
+        raise SystemExit(f"{args.to_env} is not set (add it to .env)")
+    print(f"copying to host {conninfo_to_dict(target_url).get('host')} ...")  # host only, never the password
+    with connect(target_url, autocommit=True, connect_timeout=30) as target:
+        report = copy_all(conn, target)
+    for table, (rows, checksum) in report.items():
+        print(f"  {table:9} {rows:6} rows  checksum {checksum[:12]}…  ✓ matches source")
+
+
 def cmd_status(conn, args) -> None:
     episodes = conn.execute("SELECT count(*) FROM episodes").fetchone()[0]
     print(f"episodes: {episodes}")
@@ -196,6 +213,11 @@ def main(argv: list[str] | None = None) -> None:
                           choices=["keyword", "vector", "hybrid", "hybrid+rerank"])
     p_search.add_argument("-k", type=int, default=5)
     p_search.set_defaults(func=cmd_search)
+
+    p_copy = sub.add_parser("copy-data", help="copy all data to another database (e.g. Neon), verified")
+    p_copy.add_argument("--to-env", required=True,
+                        help="NAME of the env var holding the target URL (keeps the password off the command line)")
+    p_copy.set_defaults(func=cmd_copy_data)
 
     p_ask = sub.add_parser("ask", help="answer a question with verified, timestamped citations")
     p_ask.add_argument("question")
