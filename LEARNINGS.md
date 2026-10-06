@@ -226,3 +226,73 @@ plus a 60-second interview script.
 > first, then measuring time, showed a tie at 2.65% WER. The tiebreaker was that large-v3 silently
 > skipped a 68-word passage that turbo kept, so I chose turbo: same accuracy, tighter timestamps,
 > 2.8 times cheaper, and nothing gets dropped by accident."
+
+---
+
+## M4 — Retrieval (2026-10-06)
+
+### What we built
+- **Corpus:** 8 Practical AI episodes + NPR (9 episodes, 74,135 words) transcribed by
+  `earshot worker --until-empty` in ~9 min, with 0 rate-limit hits.
+- **Passages** (`passages.py`): overlapping ~45 s windows (stride 30 s) built from word
+  *positions*, so Whisper's timestamp jitter can't drop words. 875 passages.
+- **Postgres as the search engine:** full-text (`tsvector` generated column + GIN) and
+  **pgvector** (HNSW, cosine) in the same database; no separate vector DB.
+- **Embeddings** (`embed.py`): `bge-small-en-v1.5` via fastembed (ONNX, 67 MB, no torch);
+  `embed_model` stored per row and re-embedded on a model change (embedding versioning).
+- **Search** (`search.py`): keyword with OR semantics + vector → Reciprocal Rank Fusion →
+  cross-encoder rerank of the top 20. CLI: `earshot index`, `earshot search`.
+- **Retrieval eval** (`evals/retrieval.py`, `llm.py`): an LLM-generated paraphrased golden set
+  with exact answer times; recall@k, MRR, citation offset and latency per mode and reranker.
+
+### Why
+- **One database** (FTS + vectors + queue + transcripts): transactional and simple. At
+  ~1K–100K passages a dedicated vector DB adds operations work without adding capability.
+- **RRF** fuses by rank, so incomparable scores (ts_rank vs cosine) never need calibrating.
+- **Two-stage retrieve-then-rerank:** cheap recall over everything, expensive precision on 20.
+- **The reranker was chosen on cost/latency,** not just accuracy: jina-tiny is one question
+  behind MiniLM-L-12 at half the latency.
+
+### What broke and how we fixed it
+1. **Collation mismatch on the image swap:** `pgvector:pg17` is Debian 12 (glibc 2.36); the data
+   was created on Debian 13 (glibc 2.41). A different text sort order can silently corrupt
+   text indexes (e.g. the UNIQUE `dedup_key`). Pinned `pgvector/pgvector:0.8.7-pg17-trixie`,
+   the warning went away, and `amcheck` verified all 7 B-tree indexes. Row counts matched
+   before and after.
+2. **Deployment ordering (mine):** I added `CREATE EXTENSION vector` to the schema *before*
+   swapping the image, so every new CLI command failed. Infra before code. `apply_schema` is
+   one transaction, so nothing was half-applied.
+3. **AND vs OR:** `websearch_to_tsquery` ANDs every word, and natural-language questions rarely
+   have all their words in one passage. Switched to OR (mutation-tested).
+4. **Hybrid wasn't automatically better:** plain RRF scored *below* vector alone at top-1
+   (0.51 vs 0.58) on paraphrased questions. Kept hybrid for exact-term queries and recall@10,
+   and the reranker lifts it to 0.80.
+5. **Coarse citations:** the passage start is ~15 s before the answer on median, so M5 will cite
+   the exact quoted words (located in word timings).
+6. **Memory again:** with ~0.7 GB free, the 1 GB rerankers couldn't load. The eval now runs one
+   reranker at a time and unloads it.
+7. **Tooling (mine, a third time):** a script turned `\n` into a real line break in `cli.py`.
+   New rule: code with escape sequences only via exact-match edits; verify with `ast.parse`.
+8. **Test helpers:** I imported a helper module that didn't exist. Moved the shared fakes into
+   `tests/search_helpers.py` instead of importing between test files.
+
+### Results
+| Mode | R@1 | R@5 | MRR | p50 |
+|---|---|---|---|---|
+| keyword | 0.29 | 0.53 | 0.38 | 31 ms |
+| vector | 0.58 | 0.80 | 0.67 | 41 ms |
+| hybrid | 0.51 | 0.76 | 0.60 | 69 ms |
+| hybrid + jina-tiny (default) | 0.80 | 0.93 | 0.85 | 1.35 s |
+
+### 60-second interview script
+> "Search runs entirely in Postgres: full-text search for exact terms and pgvector embeddings
+> for meaning, fused with Reciprocal Rank Fusion, then a small cross-encoder reranks the top
+> twenty. Transcripts are cut into overlapping 45-second passages so answers never straddle a
+> boundary. To choose between designs, I built an eval: an LLM writes paraphrased questions for
+> sampled passages, and I locate its verbatim evidence quote in the word timings to get the
+> exact answer time. Recall@1 went from 0.29 keyword-only, to 0.58 vector, to 0.80 with
+> reranking. A surprise was that plain hybrid fusion was *worse* than vector alone on
+> paraphrased questions, because the keyword leg adds noise there, so 'hybrid always wins' is a
+> claim to measure, not assume. I picked the reranker on the latency trade-off: one question
+> behind the most accurate model at half the latency. And the eval showed passage-level
+> citations land about 15 seconds early, so the answering stage cites the exact quoted words."

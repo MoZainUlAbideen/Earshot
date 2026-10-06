@@ -1,0 +1,70 @@
+{
+  "questions": 45,
+  "missing_episodes": 0,
+  "k": 10,
+  "modes": {
+    "keyword": {
+      "recall@1": 0.289,
+      "recall@5": 0.533,
+      "recall@10": 0.644,
+      "mrr@10": 0.378,
+      "top1_cite_offset_median_s": 27.0,
+      "top1_cite_within_15s": 0.067,
+      "latency_p50_ms": 31
+    },
+    "vector": {
+      "recall@1": 0.578,
+      "recall@5": 0.8,
+      "recall@10": 0.867,
+      "mrr@10": 0.672,
+      "top1_cite_offset_median_s": 14.7,
+      "top1_cite_within_15s": 0.289,
+      "latency_p50_ms": 41
+    },
+    "hybrid": {
+      "recall@1": 0.511,
+      "recall@5": 0.756,
+      "recall@10": 0.867,
+      "mrr@10": 0.605,
+      "top1_cite_offset_median_s": 25.3,
+      "top1_cite_within_15s": 0.178,
+      "latency_p50_ms": 69
+    },
+    "hybrid+rerank:Xenova/ms-marco-MiniLM-L-6-v2": {
+      "recall@1": 0.778,
+      "recall@5": 0.933,
+      "recall@10": 0.956,
+      "mrr@10": 0.831,
+      "top1_cite_offset_median_s": 15.2,
+      "top1_cite_within_15s": 0.378,
+      "latency_p50_ms": 1835
+    },
+    "hybrid+rerank:Xenova/ms-marco-MiniLM-L-12-v2": {
+      "recall@1": 0.822,
+      "recall@5": 0.933,
+      "recall@10": 0.956,
+      "mrr@10": 0.865,
+      "top1_cite_offset_median_s": 15.2,
+      "top1_cite_within_15s": 0.4,
+      "latency_p50_ms": 2897
+    },
+    "hybrid+rerank:jinaai/jina-reranker-v1-tiny-en": {
+      "recall@1": 0.8,
+      "recall@5": 0.933,
+      "recall@10": 0.956,
+      "mrr@10": 0.849,
+      "top1_cite_offset_median_s": 18.1,
+      "top1_cite_within_15s": 0.333,
+      "latency_p50_ms": 1347
+    },
+    "hybrid+rerank:jinaai/jina-reranker-v1-turbo-en": {
+      "recall@1": 0.667,
+      "recall@5": 0.956,
+      "recall@10": 0.956,
+      "mrr@10": 0.776,
+      "top1_cite_offset_median_s": 21.1,
+      "top1_cite_within_15s": 0.222,
+      "latency_p50_ms": 1687
+    }
+  }
+}
