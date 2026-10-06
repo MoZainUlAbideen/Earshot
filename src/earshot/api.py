@@ -61,13 +61,18 @@ class TokenBucket:
 
 
 def client_key(request: Request) -> str:
-    """Visitor identity for rate limiting. Behind a proxy (Render), the client address is the
-    proxy's, so with TRUST_PROXY=1 use the LAST X-Forwarded-For entry: the one our proxy
-    appended. Earlier entries are client-supplied and can be spoofed."""
+    """Visitor identity for rate limiting.
+
+    Behind proxies (Render), the TCP peer is a proxy, so with TRUST_PROXY=1 we read
+    X-Forwarded-For counting from the RIGHT: each of our TRUSTED_PROXY_HOPS proxies appends
+    one entry, so the client is the entry just before them. Entries further left were
+    sent by the client and can be forged, so they're never trusted. The hop count is
+    measured with /whoami, not assumed."""
     if os.environ.get("TRUST_PROXY") == "1":
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            return forwarded.split(",")[-1].strip()
+        entries = [e.strip() for e in request.headers.get("x-forwarded-for", "").split(",") if e.strip()]
+        hops = int(os.environ.get("TRUSTED_PROXY_HOPS", "1"))
+        if entries:
+            return entries[max(0, len(entries) - hops)]
     return request.client.host if request.client else "unknown"
 
 
@@ -158,6 +163,18 @@ def create_app(*, embedder=None, reranker=None, llm=None, database_url: str | No
             passages = conn.execute("SELECT count(*) FROM passages").fetchone()[0]
         return {"status": "ok", "passages": passages,
                 "search_mode": "hybrid+rerank" if request.app.state.reranker else "hybrid"}
+
+    @app.get("/")
+    def root():
+        return {"service": "Earshot API", "docs": "/docs", "health": "/health"}
+
+    @app.get("/whoami")
+    def whoami(request: Request):
+        """Shows the CALLER their own forwarding chain and the rate-limit key derived from it
+        (like a "what's my IP" page). Used to measure the proxy hop count on the host."""
+        return {"x_forwarded_for": request.headers.get("x-forwarded-for"),
+                "peer": request.client.host if request.client else None,
+                "rate_limit_key": client_key(request)}
 
     @app.get("/episodes")
     def episodes(request: Request):

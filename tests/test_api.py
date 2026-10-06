@@ -134,11 +134,33 @@ def test_token_bucket_refills_over_time():
     assert bucket.take("ip") == 0
 
 
-def test_proxy_header_is_only_trusted_when_configured(monkeypatch):
-    class Req:
-        headers = {"x-forwarded-for": "6.6.6.6, 203.0.113.9"}  # first entry is client-supplied
-        client = type("C", (), {"host": "10.0.0.1"})()
+class FakeRequest:
+    def __init__(self, forwarded):
+        self.headers = {"x-forwarded-for": forwarded} if forwarded else {}
+        self.client = type("C", (), {"host": "10.0.0.1"})()
 
-    assert api.client_key(Req()) == "10.0.0.1"
+
+def test_proxy_header_is_only_trusted_when_configured(monkeypatch):
+    req = FakeRequest("6.6.6.6, 203.0.113.9")  # first entry is client-supplied
+    assert api.client_key(req) == "10.0.0.1"
     monkeypatch.setenv("TRUST_PROXY", "1")
-    assert api.client_key(Req()) == "203.0.113.9"  # the entry our proxy appended
+    assert api.client_key(req) == "203.0.113.9"  # one trusted hop: the entry our proxy appended
+
+
+@pytest.mark.parametrize("chain, hops, expected", [
+    ("198.51.100.7, 10.1.2.3", 2, "198.51.100.7"),            # proxy appended client, then itself
+    ("6.6.6.6, 198.51.100.7, 10.1.2.3", 2, "198.51.100.7"),   # a forged leading entry is ignored
+    ("198.51.100.7", 2, "198.51.100.7"),                      # fewer entries than hops: leftmost
+])
+def test_client_is_counted_from_the_right_past_trusted_hops(monkeypatch, chain, hops, expected):
+    monkeypatch.setenv("TRUST_PROXY", "1")
+    monkeypatch.setenv("TRUSTED_PROXY_HOPS", str(hops))
+    assert api.client_key(FakeRequest(chain)) == expected
+
+
+def test_whoami_shows_the_caller_their_own_key(corpus, test_db_url):
+    with client_for(test_db_url) as c:
+        body = c.get("/whoami", headers={"X-Forwarded-For": "6.6.6.6"}).json()
+        assert body["x_forwarded_for"] == "6.6.6.6"
+        assert body["rate_limit_key"] == "testclient"  # TRUST_PROXY off: the forged header is ignored
+        assert c.get("/").json()["service"] == "Earshot API"
