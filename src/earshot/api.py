@@ -153,7 +153,8 @@ def create_app(*, embedder=None, reranker=None, llm=None, database_url: str | No
         app.state.pool.close()
 
     app = FastAPI(title="Earshot API", version="0.1.0", lifespan=lifespan)
-    origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
+    # Browsers send Origin without a trailing slash, so "https://x.app/" in the setting would never match.
+    origins = [o.strip().rstrip("/") for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"],
                        allow_headers=["Content-Type"])
     limiter = rate_limiter or TokenBucket(capacity=ASKS_PER_HOUR, per_hour=ASKS_PER_HOUR)

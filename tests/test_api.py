@@ -108,6 +108,14 @@ def test_cors_allows_only_configured_origins(corpus, test_db_url, monkeypatch):
     assert "access-control-allow-origin" not in bad.headers
 
 
+def test_cors_setting_tolerates_spaces_and_trailing_slashes(corpus, test_db_url, monkeypatch):
+    monkeypatch.setenv("ALLOWED_ORIGINS", " https://earshot-ten-pi.vercel.app/ , http://localhost:3000")
+    with client_for(test_db_url) as c:
+        r = c.options("/ask", headers={"Origin": "https://earshot-ten-pi.vercel.app",
+                                       "Access-Control-Request-Method": "POST"})
+    assert r.headers.get("access-control-allow-origin") == "https://earshot-ten-pi.vercel.app"
+
+
 def test_rerank_off_never_loads_or_calls_a_reranker(corpus, test_db_url):
     class ExplodingReranker:
         def scores(self, query, texts):
