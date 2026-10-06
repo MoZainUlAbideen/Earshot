@@ -21,6 +21,7 @@ RERANK_TOP = 20      # how many fused results the cross-encoder re-reads
 # p50, vs MiniLM-L-12 0.82 / 0.86 at 2.9 s (one question apart: noise) and MiniLM-L-6
 # 0.78 / 0.83 at 1.8 s. Near-best quality at the lowest latency; 130 MB.
 RERANK_MODEL = "jinaai/jina-reranker-v1-tiny-en"
+RERANK_BATCH = 4
 MODES = ("keyword", "vector", "hybrid", "hybrid+rerank")
 
 
@@ -89,7 +90,9 @@ class Reranker:
         return self._model
 
     def scores(self, query: str, texts: list[str]) -> list[float]:
-        return [float(s) for s in self.model.rerank(query, texts)]
+        # Small batches: ONNX Runtime's memory arena grows to the largest batch and never
+        # shrinks. Measured: batch 64 → RSS 516 MB after 7 reranks; batch 4 → 396 MB.
+        return [float(s) for s in self.model.rerank(query, texts, batch_size=RERANK_BATCH)]
 
 
 def _fetch(conn: psycopg.Connection, ranked: list[tuple[int, float]]) -> list[Hit]:

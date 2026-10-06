@@ -119,11 +119,6 @@ def transcribe_audio(
     return words, len(chunks)
 
 
-def get_transcript(conn: psycopg.Connection, episode_id: int) -> list[Word]:
-    """The stitched transcript: every word with absolute timestamps, in time order."""
-    words: list[Word] = []
-    for (chunk_words,) in conn.execute(
-        "SELECT words FROM chunks WHERE episode_id = %s ORDER BY idx", (episode_id,)
-    ):
-        words.extend(Word(w["text"], w["start"], w["end"]) for w in chunk_words)
-    return words
+# get_transcript lives in the dependency-light `transcripts` module (the API uses it without
+# loading the speech stack); re-exported here so existing imports keep working.
+from earshot.transcripts import get_transcript  # noqa: E402,F401

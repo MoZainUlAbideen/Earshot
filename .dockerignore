@@ -1,0 +1,17 @@
+# Keep secrets, local state and copyrighted eval audio out of the image.
+.env
+.env.*
+!.env.example
+.venv/
+.git/
+.github/
+.claude/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+evals/
+tests/
+docs/
+web/
+*.md
+!README.md

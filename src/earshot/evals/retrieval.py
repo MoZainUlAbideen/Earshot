@@ -23,7 +23,7 @@ import psycopg
 
 from earshot.evals.wer import normalize
 from earshot.llm import DEFAULT_CHAT_MODEL, chat_json
-from earshot.pipeline import get_transcript
+from earshot.transcripts import get_transcript
 from earshot.search import RERANK_TOP, _fetch, keyword_ids, rrf, vector_ids
 
 GOLDEN_PATH = Path("evals/golden/retrieval.jsonl")

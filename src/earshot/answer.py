@@ -18,7 +18,7 @@ import psycopg
 
 from earshot.citations import locate_quote
 from earshot.llm import DEFAULT_CHAT_MODEL, chat_json
-from earshot.pipeline import get_transcript
+from earshot.transcripts import get_transcript
 from earshot.search import Hit, search
 
 TOP_K = 5
@@ -118,9 +118,11 @@ def answer(
     llm=chat_json,
     model: str = DEFAULT_CHAT_MODEL,
     k: int = TOP_K,
+    rerank: bool = True,  # off on CPU-starved hosts (Render free: 0.1 CPU); see search eval
 ) -> Answer:
     t0 = time.perf_counter()
-    hits = search(conn, question, embedder=embedder, mode="hybrid+rerank", k=k, reranker=reranker)
+    mode = "hybrid+rerank" if rerank else "hybrid"
+    hits = search(conn, question, embedder=embedder, mode=mode, k=k, reranker=reranker)
     seconds = {"search": round(time.perf_counter() - t0, 2)}
     if not hits:
         return Answer(question, REFUSAL, found=False, seconds=seconds)

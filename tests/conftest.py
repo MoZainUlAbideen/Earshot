@@ -40,7 +40,7 @@ def test_db_url() -> str:
 def db(test_db_url):
     """A connection to the test DB with empty tables (each test starts clean)."""
     with connect(test_db_url, autocommit=True) as conn:
-        conn.execute("TRUNCATE chunks, jobs, episodes RESTART IDENTITY CASCADE")
+        conn.execute("TRUNCATE chunks, jobs, episodes, usage_daily RESTART IDENTITY CASCADE")
         yield conn
 
 

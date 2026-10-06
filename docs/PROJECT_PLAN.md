@@ -474,3 +474,57 @@ audio.
   130 MB + Python; Render Postgres + pgvector availability; cold starts; the
   DAI timestamp-drift risk for playback (section 6).
 - CI (GitHub Actions: tests on every push) before deploying.
+
+**Decisions (2026-10-06):**
+- **Hosting:** Render **Free** for the API (512 MB, **0.1 CPU**, sleeps after
+  15 min, ~1 min wake) + **Neon free Postgres** (1 GB, pgvector, permanent;
+  Render's free Postgres is deleted after 30 days). HF Docker Spaces now need
+  a paid plan. Zain chose Free + **no reranker on the server** (`RERANK=0`): at
+  0.1 CPU a cross-encoder would take tens of seconds. Cost: hybrid top-5
+  recall 0.76 vs 0.93 with rerank. One env var to turn it back on.
+- Render region `oregon`, Neon region AWS us-west-2 (same region).
+
+**Progress:**
+- [x] CI: `.github/workflows/ci.yml`, with the same pgvector image as a service,
+  `uv sync --locked`, the full test suite, a throwaway DB password, no secrets.
+- [x] API (`api.py`): `/health`, `/episodes`, `/search` (≤300-char snippets),
+  `/ask`. Models load once and are warmed; psycopg connection pool; per-IP
+  token bucket (in memory, 10/h) + **daily token budget guard** (Postgres
+  `usage_daily`, 180K < Groq's 200K; mutation-tested); CORS allow-list; Groq
+  errors mapped to 503/502. 220 tests.
+- [x] **Lean serving path:** `transcripts.py` holds `get_transcript`, so the API
+  never imports faster-whisper/ctranslate2/PyAV (verified: none loaded).
+- [x] **Memory, measured:** with the reranker, RSS 386 → 539 MB after 5
+  searches and the first request **crashed** (ONNX arena OOM: the reranker
+  scored 20 passages in one batch). Reranker `batch_size=4`: 516 → 396 MB.
+  RERANK=0: **153 MB flat**.
+- [x] Dockerfile (uv pinned, `--no-dev`, model baked in, non-root, BuildKit
+  cache mount), `.dockerignore` (no .env/evals/tests), `render.yaml`
+  (Blueprint; secrets `sync: false`).
+- [x] **Render-free simulation** (Docker `--memory=512m --cpus=0.1`, real
+  Linux): 248 MB / 512 MB, no OOM; /search median **0.98 s**; /ask **3.8 s**
+  with 3 verified citations; **cold start 78 s** → the frontend needs a
+  "waking up the server" state.
+
+**Incidents (for the M6 LEARNINGS entry):**
+- `localhost` vs `127.0.0.1`: 2,098 ms vs 75 ms per request (the M1 IPv6
+  trap, client side). Use 127.0.0.1 locally.
+- **C: hit 0 GB free** mid-Docker-build → Docker's VM disk went read-only →
+  Postgres couldn't open files. Freed ~4.3 GB (pip purge + `uv cache clean`,
+  Zain's choice), restarted Docker/WSL; Postgres ran **WAL crash recovery**
+  (redo → end-of-recovery checkpoint) and every row was intact (9/50/74,135/
+  875/875).
+- Aftermath: `python:3.12-slim` failed with `exec format error` even though
+  its arch matched (amd64): layers corrupted by the interrupted pull, and
+  re-pulls reused the cached copy. Fixed with `docker rmi` + `docker builder
+  prune -af`.
+- The first image was **2.49 GB** (uv cache baked into a layer) and C: fell to
+  0.8 GB again → BuildKit cache mount. **Docker's disk must move to D:.**
+
+**Next (needs Zain):**
+1. Docker Desktop → Settings → Resources → Advanced → Disk image location → D:.
+2. Create a Neon project (region AWS us-west-2, Oregon) and put its **direct**
+   (not `-pooler`) connection string in `.env` as `NEON_DATABASE_URL`. Direct,
+   because psycopg prepares statements and the API has its own pool.
+3. Then: copy the data to Neon (pg_dump → pg_restore), deploy the Render
+   Blueprint, then the Next.js frontend on Vercel.

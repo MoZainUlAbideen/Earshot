@@ -78,3 +78,11 @@ CREATE TABLE IF NOT EXISTS passages (
 );
 CREATE INDEX IF NOT EXISTS passages_tsv_idx ON passages USING GIN (tsv);
 CREATE INDEX IF NOT EXISTS passages_embedding_idx ON passages USING hnsw (embedding vector_cosine_ops);
+
+-- Daily LLM usage, for the API's budget guard: refuse new questions before the provider's
+-- daily token cap is hit, instead of failing mid-answer. One row per UTC day.
+CREATE TABLE IF NOT EXISTS usage_daily (
+    day     DATE PRIMARY KEY,
+    tokens  BIGINT NOT NULL DEFAULT 0,
+    answers INTEGER NOT NULL DEFAULT 0
+);

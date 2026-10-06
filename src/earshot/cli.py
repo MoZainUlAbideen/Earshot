@@ -35,7 +35,7 @@ def cmd_eval_librispeech(args) -> None:
 
 def cmd_eval_signals(conn, args) -> None:
     from earshot.evals.signals import summarize
-    from earshot.pipeline import get_transcript
+    from earshot.transcripts import get_transcript
 
     result = summarize(get_transcript(conn, args.episode_id))
     print(f"episode {args.episode_id}: {result['words']} words | compressed runs {result['compressed_run']} | "

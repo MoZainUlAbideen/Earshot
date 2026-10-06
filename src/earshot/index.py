@@ -10,7 +10,7 @@ import psycopg
 
 from earshot.ingest import TRANSCRIBE
 from earshot.passages import make_passages
-from earshot.pipeline import get_transcript
+from earshot.transcripts import get_transcript
 
 
 def episodes_to_index(conn: psycopg.Connection) -> list[int]:

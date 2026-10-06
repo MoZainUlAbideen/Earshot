@@ -1,0 +1,24 @@
+# Render Blueprint: the API as code. Secrets use `sync: false`, so Render asks for them in
+# the dashboard when the Blueprint is created; they never live in this repo.
+services:
+  - type: web
+    name: earshot-api
+    runtime: docker
+    plan: free
+    region: oregon            # keep the Neon database in the same region (AWS us-west-2)
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL          # Neon connection string (pgvector)
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS       # the Vercel site URL, e.g. https://earshot.vercel.app
+        sync: false
+      - key: RERANK                # free tier has 0.1 CPU: cross-encoder off (see README results)
+        value: "0"
+      - key: TRUST_PROXY           # use the proxy-appended X-Forwarded-For entry for rate limits
+        value: "1"
+      - key: ASKS_PER_HOUR
+        value: "10"
+      - key: DAILY_TOKEN_BUDGET
+        value: "180000"
