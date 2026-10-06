@@ -96,6 +96,36 @@ def cmd_search(conn, args) -> None:
         print(f"   {h.text[:220]}...")
 
 
+def cmd_eval_retrieval_golden(conn, args) -> None:
+    from earshot.evals import retrieval
+
+    if retrieval.GOLDEN_PATH.exists() and not args.force:
+        raise SystemExit(f"{retrieval.GOLDEN_PATH} exists; a golden set should stay stable. Use --force to regenerate.")
+    golden, stats = retrieval.generate_golden(conn, n=args.n)
+    retrieval.save_golden(golden)
+    print(f"{len(golden)} questions saved to {retrieval.GOLDEN_PATH} "
+          f"(sampled {stats['sampled']}, skipped {stats['skipped']}, unlocated {stats['unlocated']}, "
+          f"{stats['tokens']} LLM tokens)")
+
+
+def cmd_eval_retrieval(conn, args) -> None:
+    import json
+
+    from earshot.embed import Embedder
+    from earshot.evals import retrieval
+    from earshot.search import Reranker
+
+    rerankers = {name: Reranker(name) for name in args.rerankers}
+    report = retrieval.evaluate(conn, retrieval.load_golden(), Embedder(), rerankers)
+    retrieval.RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    retrieval.RESULTS_PATH.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(f"{report['questions']} questions (k={report['k']}); missing episodes: {report['missing_episodes']}")
+    print(f"{'mode':52} {'R@1':>5} {'R@5':>5} {'R@10':>5} {'MRR':>5} {'cite<=15s':>9} {'offset':>6} {'p50 ms':>7}")
+    for mode, m in report["modes"].items():
+        print(f"{mode:52} {m['recall@1']:5.2f} {m['recall@5']:5.2f} {m['recall@10']:5.2f} {m['mrr@10']:5.2f} "
+              f"{m['top1_cite_within_15s']:9.2f} {str(m['top1_cite_offset_median_s']):>6} {str(m['latency_p50_ms']):>7}")
+
+
 def cmd_status(conn, args) -> None:
     episodes = conn.execute("SELECT count(*) FROM episodes").fetchone()[0]
     print(f"episodes: {episodes}")
@@ -152,6 +182,13 @@ def main(argv: list[str] | None = None) -> None:
     p_prep.add_argument("--local-model", default="small.en",
                         help="neutral draft model; use base.en if RAM is tight (small.en commits ~2.5 GB)")
     p_prep.set_defaults(func=cmd_eval_podcast_prepare)
+    p_gold = eval_sub.add_parser("retrieval-golden", help="LLM-generate the retrieval golden question set")
+    p_gold.add_argument("--n", type=int, default=60)
+    p_gold.add_argument("--force", action="store_true", help="overwrite an existing golden set")
+    p_gold.set_defaults(func=cmd_eval_retrieval_golden)
+    p_ret = eval_sub.add_parser("retrieval", help="recall@k / MRR / citation offset per search mode")
+    p_ret.add_argument("--rerankers", nargs="+", default=["Xenova/ms-marco-MiniLM-L-6-v2"])
+    p_ret.set_defaults(func=cmd_eval_retrieval)
     p_pod = eval_sub.add_parser("podcast", help="WER of each model vs your corrected reference")
     p_pod.add_argument("name")
     p_pod.set_defaults(func=cmd_eval_podcast, needs_db=False)

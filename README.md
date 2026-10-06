@@ -11,9 +11,9 @@ questions across many episodes at once. Every claim in an answer carries a
 > *"What do AI researchers say about scaling laws hitting a wall?"*
 > → An answer drawn from several episodes, with each claim linked to the moment it was said.
 
-**Status:** 🚧 In active development. Milestones 1–2 are complete: ingestion, a
-crash-safe job queue, and transcription with word-level timestamps, evaluated end to
-end on real podcasts. Search is next. See [Roadmap](#roadmap).
+**Status:** 🚧 In active development. Milestones 1, 2 and 4 are complete: ingestion,
+a crash-safe job queue, transcription with word-level timestamps, and evaluated hybrid
+search. Answering with citations is next. See [Roadmap](#roadmap).
 
 ---
 
@@ -94,6 +94,24 @@ The podcast eval also exposed **anchoring bias**: a hand-corrected reference tha
 from a model's draft kept 99.7% of the draft, so it measured agreement with that model, not
 accuracy. The scorer now flags any reference that changed less than 1% of the draft.
 
+**Retrieval:** 45 LLM-generated, deliberately paraphrased questions over 9 episodes (875
+passages), each with an exact answer time located from a verbatim quote. Recall is a lower
+bound (only one passage counts as correct per question). Measured 2026-10-06
+([results](evals/results/retrieval.json)).
+
+| Mode | Recall@1 | Recall@5 | MRR | p50 latency (laptop CPU) |
+|---|---|---|---|---|
+| Keyword (Postgres full-text) | 0.29 | 0.53 | 0.38 | 31 ms |
+| Vector (bge-small + pgvector) | 0.58 | 0.80 | 0.67 | 41 ms |
+| Hybrid (RRF) | 0.51 | 0.76 | 0.60 | 69 ms |
+| **Hybrid + rerank (jina-reranker-v1-tiny, default)** | **0.80** | **0.93** | **0.85** | 1.35 s |
+| Hybrid + rerank (MiniLM-L-12) | 0.82 | 0.93 | 0.86 | 2.9 s |
+
+Reranking is the big win. Plain RRF *hurt* top-1 on paraphrased questions (the keyword
+leg adds noise there), but it helps exact-term queries ("AGENTS.md") and keeps recall@10
+high for the reranker. Passage *starts* are too coarse for citations (the answer sits
+about 15 s in), so answers cite the exact quoted words instead.
+
 ```powershell
 uv run earshot eval librispeech --model whisper-large-v3
 ```
@@ -108,8 +126,8 @@ uv run earshot eval librispeech --model whisper-large-v3
 | **M1** Ingestion + queue | RSS ingestion, dedup, Postgres job queue (claim / retry / backoff / crash recovery) | ✅ Done |
 | **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | ✅ Done |
 | **M3** Enrichment | Ad detection, NER, chapters + summaries | Planned |
-| **M4** Retrieval | Hybrid keyword + embeddings, reranker, retrieval evals | 🚧 Search works: retrieval eval next |
-| **M5** Agents | Router, answerer with citations, deterministic critic | Planned |
+| **M4** Retrieval | Hybrid keyword + embeddings, reranker, retrieval evals | ✅ Done |
+| **M5** Agents | Router, answerer with citations, deterministic critic | ⏳ Next |
 | **M6** Live product | FastAPI on Render, Next.js on Vercel, rate limiting | Planned |
 | **M7** LLMOps | Langfuse tracing, CI eval gate, cost per audio-hour, embedding versioning | Planned |
 
@@ -126,7 +144,7 @@ Urdu-language podcasts.
 | Database + queue + vectors | PostgreSQL 17 + pgvector (Docker locally), psycopg 3 |
 | Ingestion | feedparser, httpx |
 | Speech *(planned)* | Silero VAD, Whisper (Groq API / faster-whisper) |
-| Search | Postgres full-text + `bge-small-en-v1.5` embeddings (fastembed/ONNX), RRF, MiniLM cross-encoder |
+| Search | Postgres full-text + `bge-small-en-v1.5` embeddings (fastembed/ONNX), RRF, jina-reranker-v1-tiny cross-encoder |
 | Serving *(planned)* | FastAPI (Render), Next.js (Vercel) |
 | Observability *(planned)* | Langfuse, CI eval gate |
 
@@ -182,6 +200,7 @@ uv run earshot search "What is an AGENTS.md file used for?"
 
 Each hit is a ~45 s passage with the timestamp to cite. Search combines Postgres
 full-text and pgvector embeddings (Reciprocal Rank Fusion), then a cross-encoder reranks.
+Measure it with `uv run earshot eval retrieval`.
 
 ### Run the tests
 

@@ -410,12 +410,48 @@ audio.
   in every mode, and the MiniLM reranker put two passages first that merely
   share the word "chatbot". Anecdotes, not evidence; step 6 measures it.
 
-**Current step: M4 step 6, retrieval eval.**
-- Golden set: an LLM (Groq chat model) writes **paraphrased** questions for
-  sampled passages (ground truth = the passage's episode + time), instructed
-  not to reuse distinctive words (otherwise keyword search gets an unfair
-  edge), plus a few hand-written ones.
-- Metrics: recall@1/5/10, MRR, and timestamp hit rate (the top hit's start
-  within ±15 s of the answer passage) for keyword / vector / hybrid /
-  hybrid+rerank, and rerankers MiniLM-L-6 vs bge-reranker-base vs jina-turbo.
-- Report latency per mode too (the reranker cost/latency trade-off).
+- [x] Step 6, retrieval eval (`evals/retrieval.py`, `llm.py`): Groq
+  `openai/gpt-oss-120b` (free: 30 RPM, 8K TPM, **200K tokens/day**, which caps
+  M5 at ~40–60 answers/day) wrote paraphrased questions for 63 sampled
+  passages: 45 kept (8 skipped as ads/small talk, 10 dropped because the
+  "verbatim" quote wasn't verbatim). 33.6K tokens. The golden file stores
+  questions + (feed_url, guid, answer_time), no transcript text.
+  `retrieval-golden` refuses to overwrite without `--force`. Paraphrase check:
+  median 43% of question content words appear in the passage. Recall is a lower
+  bound (near-duplicate questions; one correct passage each).
+  **Results** (R@1 / R@5 / MRR / p50): keyword .29/.53/.38/31 ms; vector
+  .58/.80/.67/41 ms; hybrid .51/.76/.60/69 ms; +rerank MiniLM-L-6
+  .78/.93/.83/1.8 s; MiniLM-L-12 .82/.93/.86/2.9 s; **jina-tiny .80/.93/.85/1.35 s
+  (new default)**; jina-turbo .67/.96/.78/1.7 s. bge-reranker-base (1.04 GB)
+  didn't fit in ~0.7 GB of free RAM. The eval runs one reranker at a time, then
+  unloads it.
+  **Findings:** reranking is the big win; plain RRF *hurt* top-1 on paraphrases
+  (the weak keyword leg adds noise), but hybrid is kept for exact-term queries
+  and recall@10; passage-start citations are too coarse (median offset ~15 s,
+  ≤15 s only ~35–40%) → **M5 cites the exact quoted words**.
+  **Known hard case:** "how can a company make chatbots recommend its product"
+  (answer: AI-search episode ~39:28) isn't in the top 3 even after rerank
+  (vocabulary gap). Add it to a hand-written set.
+- [x] **M4 complete** (179 tests). LEARNINGS.md entry written; README
+  results/roadmap updated.
+
+## 9. Next step
+
+### M5 plan: answering with verified citations (to agree before coding)
+- **Retrieve:** hybrid+rerank top 5 (R@5 = 0.93).
+- **Answer:** gpt-oss-120b gets the question plus numbered passages (episode
+  title, time) and must return JSON: an answer with [n] markers, and for each
+  [n] a verbatim quote from passage n.
+- **Critic (deterministic, not an LLM):** every quote must appear verbatim
+  (normalized) in its cited passage; then locate it in the word timings →
+  **citation time = the quote's first word** (fixes the ~15 s passage offset).
+  Unverifiable citations are dropped; an answer left with no verified
+  citation becomes "I couldn't find this in the episodes" (no unsupported
+  claims). Possibly one repair retry.
+- **Router:** MVP is a single path. Add the router (compare shows / summarize
+  episode / find quote) after the MVP works.
+- **Eval:** reuse the 45 golden questions → citation accuracy (verified cite
+  within ±15 s of answer_time), quote-verification rate (faithfulness),
+  refusal rate, tokens per answer (budget: 200K/day).
+- **Budget guard:** count tokens per answer; the API's daily cap shapes M6
+  rate limiting.

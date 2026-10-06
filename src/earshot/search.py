@@ -17,7 +17,10 @@ from earshot.embed import Embedder, to_pgvector
 RRF_K = 60
 CANDIDATES = 50      # per leg, before fusion
 RERANK_TOP = 20      # how many fused results the cross-encoder re-reads
-RERANK_MODEL = "Xenova/ms-marco-MiniLM-L-6-v2"
+# Chosen by eval (evals/results/retrieval.json, 45 questions): R@1 0.80 / MRR 0.85 at 1.35 s
+# p50, vs MiniLM-L-12 0.82 / 0.86 at 2.9 s (one question apart: noise) and MiniLM-L-6
+# 0.78 / 0.83 at 1.8 s. Near-best quality at the lowest latency; 130 MB.
+RERANK_MODEL = "jinaai/jina-reranker-v1-tiny-en"
 MODES = ("keyword", "vector", "hybrid", "hybrid+rerank")
 
 
