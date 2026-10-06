@@ -92,3 +92,29 @@ def test_errors_never_contain_the_key():
     with pytest.raises(LLMError) as exc:
         call(client)
     assert KEY not in str(exc.value)
+
+
+def test_key_whitespace_is_stripped_from_the_header():
+    headers = []
+
+    def handler(request):
+        headers.append(request.headers["Authorization"])
+        return ok({"a": 1})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    chat_json(MSG, api_key=KEY + "\n", client=client)  # as pasted into a dashboard
+    assert headers == [f"Bearer {KEY}"]
+
+
+def test_malformed_request_fails_fast_without_retries():
+    attempts = []
+
+    def handler(request):
+        attempts.append(1)
+        raise httpx.LocalProtocolError("Illegal header value")
+
+    sleeps = []
+    with pytest.raises(LLMError) as exc:
+        chat_json(MSG, api_key=KEY, client=httpx.Client(transport=httpx.MockTransport(handler)), sleep=sleeps.append)
+    assert exc.value.retryable is False and "GROQ_API_KEY" in str(exc.value)
+    assert len(attempts) == 1 and sleeps == []

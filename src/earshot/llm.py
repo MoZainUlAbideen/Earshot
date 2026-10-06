@@ -58,13 +58,18 @@ def chat_json(
     }
     if reasoning_effort and model.startswith("openai/gpt-oss"):
         body["reasoning_effort"] = reasoning_effort
-    headers = {"Authorization": f"Bearer {api_key or get_api_key()}"}
+    headers = {"Authorization": f"Bearer {(api_key or get_api_key()).strip()}"}
 
     http = client or httpx.Client(timeout=TIMEOUT)
     try:
         for attempt in range(MAX_RETRIES + 1):
             try:
                 response = http.post(GROQ_CHAT_URL, headers=headers, json=body)
+            except httpx.LocalProtocolError:
+                # Our request was malformed and never left the machine; every retry would fail
+                # the same way (this once cost 15 s of backoff per question in production).
+                raise LLMError("request rejected before sending (malformed header? check GROQ_API_KEY)",
+                               retryable=False) from None
             except httpx.TransportError as e:
                 if attempt == MAX_RETRIES:
                     raise LLMError(f"network error talking to Groq: {type(e).__name__}", retryable=True) from None

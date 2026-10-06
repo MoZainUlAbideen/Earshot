@@ -50,7 +50,9 @@ class TranscriptionError(Exception):
 
 def get_api_key() -> str:
     load_dotenv()
-    key = os.environ.get("GROQ_API_KEY", "")
+    # strip(): keys pasted into a dashboard often carry a trailing newline/space, which makes
+    # the Authorization header illegal (h11 refuses to send it: LocalProtocolError).
+    key = os.environ.get("GROQ_API_KEY", "").strip()
     if not key or key == "your-groq-key":
         raise RuntimeError("GROQ_API_KEY is not set. Add your key to .env.")
     return key
@@ -65,7 +67,7 @@ def transcribe_chunk(
     client: httpx.Client | None = None,
 ) -> Transcription:
     """Transcribe one FLAC chunk. Word times are relative to the chunk's start."""
-    key = api_key or get_api_key()
+    key = (api_key or get_api_key()).strip()
     data = {
         "model": model,
         "response_format": "verbose_json",
@@ -83,6 +85,9 @@ def transcribe_chunk(
             data=data,
             files={"file": ("chunk.flac", flac, "audio/flac")},
         )
+    except httpx.LocalProtocolError:  # our request was malformed and never sent; retrying can't fix it
+        raise TranscriptionError("request rejected before sending (malformed header? check GROQ_API_KEY)",
+                                 retryable=False) from None
     except httpx.TransportError as e:  # timeouts, DNS, connection resets
         raise TranscriptionError(f"network error talking to Groq: {type(e).__name__}", retryable=True) from None
     finally:

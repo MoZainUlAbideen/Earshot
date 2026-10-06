@@ -546,11 +546,15 @@ audio.
   Cloudflare → Render LB, so the old "last entry" key was Render's internal IP (all
   visitors would share one bucket). `TRUSTED_PROXY_HOPS=3` in render.yaml. **Not live yet:**
   /whoami still showed the 10.x key after the push, so the Blueprint must be synced.
-- [ ] **Live /ask returns 502 every time** (~16.8 s = the retry loop's 1+2+4+8 s backoff,
-  so every Groq attempt from Render fails with a network error or 5xx). The same code and
-  question against Neon from the laptop: 3/3 OK. The API never logged the cause, an
-  observability gap: it now logs the LLMError message (status/type, never the key).
-  Next: read Render's logs after a failing ask.
+- [x] **Live /ask returned 502 every time** (~16.8 s = the retry loop's 1+2+4+8 s backoff).
+  The same code from the laptop: 3/3 OK. Added error logging (status/type, never the key);
+  Render then showed `network error talking to Groq: LocalProtocolError`. **Root cause:**
+  the GROQ_API_KEY pasted into Render had trailing whitespace, so the Authorization header
+  was illegal and h11 refused to send it. Reproduced locally (key+"
+" / key+" " →
+  LocalProtocolError; " "+key → 401). Fixes: strip the key; treat LocalProtocolError as
+  **non-retryable** (our own malformed request, so retrying only burned 15 s). Both
+  mutation-tested. Lesson: classify errors before retrying them.
 - [x] **Frontend (`web/`, Next.js 16.3 + Tailwind 4):** AMD-inspired dark theme (black,
   white text, cyan for anything clickable, red only for the logo and the main button).
   Every page is **static**; the browser calls Render directly, and a `/health` ping on page

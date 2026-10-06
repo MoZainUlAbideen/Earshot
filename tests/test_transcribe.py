@@ -124,6 +124,22 @@ def test_network_failure_is_retryable():
     assert exc.value.retryable is True
 
 
+def test_malformed_request_is_not_retryable():
+    def handler(request):
+        raise httpx.LocalProtocolError("Illegal header value")
+
+    with pytest.raises(TranscriptionError) as exc:
+        run(fake_client(handler))
+    assert exc.value.retryable is False
+
+
+def test_key_from_the_environment_is_stripped(monkeypatch):
+    from earshot.transcribe import get_api_key
+
+    monkeypatch.setenv("GROQ_API_KEY", "  gsk_test_FAKE\n")
+    assert get_api_key() == "gsk_test_FAKE"
+
+
 @pytest.mark.parametrize("status", [400, 401, 429, 500])
 def test_errors_never_contain_the_api_key(status):
     with pytest.raises((RateLimited, TranscriptionError)) as exc:
