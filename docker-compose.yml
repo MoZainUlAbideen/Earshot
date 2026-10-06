@@ -2,7 +2,9 @@
 # Credentials come from .env (see .env.example).
 services:
   postgres:
-    image: postgres:17
+    # Postgres 17 + pgvector, pinned. "trixie" = Debian 13, the same OS (glibc 2.41) the data was
+    # created on: a different glibc changes text sort order and can corrupt text indexes.
+    image: pgvector/pgvector:0.8.7-pg17-trixie
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}

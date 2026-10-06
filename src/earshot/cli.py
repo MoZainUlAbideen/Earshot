@@ -70,9 +70,38 @@ def cmd_eval_podcast(args) -> None:
               f"{r['speed_x_realtime']}x real time{flag}")
 
 
+def cmd_index(conn, args) -> None:
+    from earshot.embed import Embedder, embed_pending
+    from earshot.index import index_new_episodes
+
+    built = index_new_episodes(conn)
+    print(f"passages built for {len(built)} episode(s): {sum(built.values())} passages")
+    embedded = embed_pending(conn, Embedder())
+    print(f"embedded {embedded} passage(s)")
+
+
+def _clock(seconds: float) -> str:
+    return f"{int(seconds // 3600)}:{int(seconds % 3600 // 60):02d}:{int(seconds % 60):02d}" if seconds >= 3600         else f"{int(seconds // 60)}:{int(seconds % 60):02d}"
+
+
+def cmd_search(conn, args) -> None:
+    from earshot.embed import Embedder
+    from earshot.search import search
+
+    hits = search(conn, args.query, embedder=Embedder(), mode=args.mode, k=args.k)
+    if not hits:
+        print("no results")
+    for rank, h in enumerate(hits, 1):
+        print(f"{rank}. [{_clock(h.start)}] {h.title[:70]}  (score {h.score:.3f})")
+        print(f"   {h.text[:220]}...")
+
+
 def cmd_status(conn, args) -> None:
     episodes = conn.execute("SELECT count(*) FROM episodes").fetchone()[0]
     print(f"episodes: {episodes}")
+    passages, embedded = conn.execute(
+        "SELECT count(*), count(embedding) FROM passages").fetchone()
+    print(f"passages: {passages} ({embedded} embedded)")
     for status, count in conn.execute(
         "SELECT status, count(*) FROM jobs GROUP BY status ORDER BY status"
     ):
@@ -97,6 +126,16 @@ def main(argv: list[str] | None = None) -> None:
 
     p_status = sub.add_parser("status", help="show episode and job counts")
     p_status.set_defaults(func=cmd_status)
+
+    p_index = sub.add_parser("index", help="build passages + embeddings for transcribed episodes")
+    p_index.set_defaults(func=cmd_index)
+
+    p_search = sub.add_parser("search", help="search transcripts; prints timestamped hits")
+    p_search.add_argument("query")
+    p_search.add_argument("--mode", default="hybrid+rerank",
+                          choices=["keyword", "vector", "hybrid", "hybrid+rerank"])
+    p_search.add_argument("-k", type=int, default=5)
+    p_search.set_defaults(func=cmd_search)
 
     p_eval = sub.add_parser("eval", help="quality evaluations (dev dependencies)")
     eval_sub = p_eval.add_subparsers(dest="eval_name", required=True)

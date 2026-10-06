@@ -384,9 +384,38 @@ audio.
 → 3 embeddings → 4 keyword + vector + RRF search, `earshot search` → 5 reranker
 → 6 golden set + retrieval eval.
 
-**In progress:** corpus batch 1 (8 Practical AI episodes) transcribing in the
-background: `earshot worker --until-empty` (new flag: exits when no work is
-left, but waits out rate-limit deferrals). Groq free tier allows 2 audio-h per
-hour, so expect 429 deferrals.
+**Progress:**
+- [x] Corpus batch 1: 8 Practical AI episodes in **~9 min**, **0 × 429**, then
+  `--until-empty` exited cleanly. Groq's documented 2 audio-h/hour wasn't
+  binding for this account (observed, not guaranteed). Corpus: 9 episodes,
+  50 chunks, 74,135 words.
+- [x] Step 1 passages (`passages.py`): NPR → 75 passages, median 120 words.
+- [x] Step 2 pgvector: image pinned to `pgvector/pgvector:0.8.7-pg17-trixie`.
+  **Gotcha:** plain `pg17` is Debian 12 (glibc 2.36), but the data was created
+  on Debian 13 (glibc 2.41), which gave a collation mismatch warning (text sort
+  order can differ, risking silent text-index corruption). Switched to
+  `-trixie`; the warning went away and `amcheck` verified all 7 B-tree indexes.
+  **Gotcha 2:** the schema needing `vector` was written before the image swap,
+  so every new CLI command failed until the swap (deployment ordering: infra
+  before code). `apply_schema` runs in one transaction, so nothing was
+  half-applied.
+- [x] Steps 3–5: `index.py` (only `done` episodes; atomic rebuild), `embed.py`
+  (bge-small 384-d, 67 MB; `embed_model` per row; re-embeds on model change;
+  commits per batch), `search.py` (keyword with **OR** semantics, mutation-tested;
+  vector; RRF; MiniLM reranker 80 MB). CLI: `earshot index`, `earshot search`.
+  875 passages embedded in ~3 min. 165 tests passing.
+- **First real queries:** "AGENTS.md" → every mode hits 26:44 in the right
+  episode (keyword-only drifts to other "agents" episodes at ranks 2–3). The
+  paraphrase "make chatbots recommend its product": the right episode is only #3
+  in every mode, and the MiniLM reranker put two passages first that merely
+  share the word "chatbot". Anecdotes, not evidence; step 6 measures it.
 
-**Current step: M4 step 1, passages.**
+**Current step: M4 step 6, retrieval eval.**
+- Golden set: an LLM (Groq chat model) writes **paraphrased** questions for
+  sampled passages (ground truth = the passage's episode + time), instructed
+  not to reuse distinctive words (otherwise keyword search gets an unfair
+  edge), plus a few hand-written ones.
+- Metrics: recall@1/5/10, MRR, and timestamp hit rate (the top hit's start
+  within ±15 s of the answer passage) for keyword / vector / hybrid /
+  hybrid+rerank, and rerankers MiniLM-L-6 vs bge-reranker-base vs jina-turbo.
+- Report latency per mode too (the reranker cost/latency trade-off).

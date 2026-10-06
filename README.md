@@ -108,7 +108,7 @@ uv run earshot eval librispeech --model whisper-large-v3
 | **M1** Ingestion + queue | RSS ingestion, dedup, Postgres job queue (claim / retry / backoff / crash recovery) | ✅ Done |
 | **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | ✅ Done |
 | **M3** Enrichment | Ad detection, NER, chapters + summaries | Planned |
-| **M4** Retrieval | Hybrid BM25 + embeddings, reranker, retrieval evals | Planned |
+| **M4** Retrieval | Hybrid keyword + embeddings, reranker, retrieval evals | 🚧 Search works: retrieval eval next |
 | **M5** Agents | Router, answerer with citations, deterministic critic | Planned |
 | **M6** Live product | FastAPI on Render, Next.js on Vercel, rate limiting | Planned |
 | **M7** LLMOps | Langfuse tracing, CI eval gate, cost per audio-hour, embedding versioning | Planned |
@@ -123,10 +123,10 @@ Urdu-language podcasts.
 | Area | Choice |
 |---|---|
 | Language / tooling | Python 3.12, [uv](https://docs.astral.sh/uv/), pytest |
-| Database + queue | PostgreSQL 17 (Docker locally), psycopg 3 |
+| Database + queue + vectors | PostgreSQL 17 + pgvector (Docker locally), psycopg 3 |
 | Ingestion | feedparser, httpx |
 | Speech *(planned)* | Silero VAD, Whisper (Groq API / faster-whisper) |
-| Search *(planned)* | BM25, sentence embeddings, cross-encoder reranker |
+| Search | Postgres full-text + `bge-small-en-v1.5` embeddings (fastembed/ONNX), RRF, MiniLM cross-encoder |
 | Serving *(planned)* | FastAPI (Render), Next.js (Vercel) |
 | Observability *(planned)* | Langfuse, CI eval gate |
 
@@ -165,8 +165,23 @@ jobs done: 1
 
 A 35-minute episode becomes about 6,000 words with word-level timestamps in about a
 minute. Run `ingest` again and it reports `0 new … 1 already known` (idempotency).
-Run `earshot worker` without `--once` to keep processing until you press Ctrl+C;
-an interrupted job is handed back to the queue immediately.
+Use `earshot worker --until-empty` to process the whole queue and exit; an interrupted
+job is handed back to the queue immediately.
+
+Then index and search:
+
+```powershell
+uv run earshot index
+uv run earshot search "What is an AGENTS.md file used for?"
+```
+
+```
+1. [26:44] From AGENTS.md to Enterprise Deployment  (score 4.103)
+   ...
+```
+
+Each hit is a ~45 s passage with the timestamp to cite. Search combines Postgres
+full-text and pgvector embeddings (Reciprocal Rank Fusion), then a cross-encoder reranks.
 
 ### Run the tests
 
@@ -202,6 +217,10 @@ src/earshot/
   pipeline.py     # checkpointed episode transcription (chunks table)
   download.py     # streamed temp download with timeout and size cap
   worker.py       # claim → download → transcribe → complete, failures routed
+  passages.py     # transcript → overlapping 45 s windows
+  index.py        # build passages for finished episodes
+  embed.py        # bge-small embeddings, versioned per row
+  search.py       # keyword + vector + RRF + rerank
   evals/          # WER (Whisper normalizer) + LibriSpeech eval, align-by-text scoring
 tests/            # pytest suite + fixtures (sample RSS feed)
 docs/             # project plan and decisions

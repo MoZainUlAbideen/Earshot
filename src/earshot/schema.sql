@@ -56,3 +56,25 @@ CREATE TABLE IF NOT EXISTS chunks (
     UNIQUE (episode_id, idx),
     CHECK (end_s > start_s)
 );
+
+-- Search index. pgvector adds the `vector` type (image: pgvector/pgvector:pg17).
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Passages: overlapping ~45 s transcript windows, the unit of search and citation.
+-- `tsv` (keyword search) is computed by Postgres from `text`, so it can never drift.
+-- `embedding` is NULL until embedded; `embed_model` records which model made it,
+-- so a model change can find and re-embed old vectors (embedding versioning).
+CREATE TABLE IF NOT EXISTS passages (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    episode_id  BIGINT NOT NULL REFERENCES episodes (id) ON DELETE CASCADE,
+    idx         INTEGER NOT NULL CHECK (idx >= 0),
+    start_s     DOUBLE PRECISION NOT NULL,
+    end_s       DOUBLE PRECISION NOT NULL,
+    text        TEXT NOT NULL,
+    tsv         TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', text)) STORED,
+    embedding   VECTOR(384),
+    embed_model TEXT,
+    UNIQUE (episode_id, idx)
+);
+CREATE INDEX IF NOT EXISTS passages_tsv_idx ON passages USING GIN (tsv);
+CREATE INDEX IF NOT EXISTS passages_embedding_idx ON passages USING hnsw (embedding vector_cosine_ops);
