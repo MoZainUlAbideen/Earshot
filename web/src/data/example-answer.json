@@ -1,0 +1,31 @@
+{
+  "question": "Why does NVIDIA think open models matter?",
+  "answer": "NVIDIA says open models are critical because building them helps the company understand what GPU architecture to create, ensuring the hardware fits the needs of the ecosystem[2] and because open models let developers test and combine them for innovative business applications, fostering both academic and industry advancement[2][3].",
+  "found": true,
+  "citations": [
+    {
+      "n": 2,
+      "quote": "through building the model, we better understand what kind of computer we should build, what kind of GPU architecture we should have, so that NVIDIA can always be there to help the whole ecosystem",
+      "episode_id": 14,
+      "title": "Open models and the future of Physical AI with NVIDIA",
+      "audio_url": "https://pscrb.fm/rss/p/dts.podtrac.com/redirect.mp3/media.transistor.fm/217445d3/e1eb0b6a.mp3",
+      "time": 316.73
+    },
+    {
+      "n": 2,
+      "quote": "we also want to measure people are enabled to do amazing applications. So when we have open model there, and people can test this out first and combine them to do application good for their targeted business",
+      "episode_id": 14,
+      "title": "Open models and the future of Physical AI with NVIDIA",
+      "audio_url": "https://pscrb.fm/rss/p/dts.podtrac.com/redirect.mp3/media.transistor.fm/217445d3/e1eb0b6a.mp3",
+      "time": 328.83
+    },
+    {
+      "n": 3,
+      "quote": "there's a lot of reasons why open model is critical, both for academy and also for the whole industry",
+      "episode_id": 14,
+      "title": "Open models and the future of Physical AI with NVIDIA",
+      "audio_url": "https://pscrb.fm/rss/p/dts.podtrac.com/redirect.mp3/media.transistor.fm/217445d3/e1eb0b6a.mp3",
+      "time": 348.49
+    }
+  ]
+}

@@ -36,3 +36,23 @@ jobs:
         run: uv sync --locked
       - name: Tests
         run: uv run pytest
+
+  web:
+    # The Next.js site: lint, unit tests, and a production build (which also type-checks).
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install (exact versions from package-lock.json)
+        run: npm ci
+      - run: npx eslint .
+      - run: npm test
+      - run: npm run build

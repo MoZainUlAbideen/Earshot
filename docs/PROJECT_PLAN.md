@@ -540,7 +540,30 @@ audio.
   is a bash control operator. A `.env` file isn't a shell script; use
   python-dotenv (or `uv run --env-file`).
 
-**Next:** Render Blueprint deploy (Zain, dashboard), check the live /health, then
-verify TRUST_PROXY/X-Forwarded-For behaviour on Render; then the Next.js frontend on
-Vercel (with a "waking up the server" state for the ~1 min cold start), then set
-ALLOWED_ORIGINS to the Vercel URL.
+- [x] **Render live** at https://earshot-api.onrender.com (health/search/episodes verified,
+  CORS blocks unknown origins, CI green).
+- [x] **Proxy hops measured, not assumed:** `/whoami` showed the chain is client →
+  Cloudflare → Render LB, so the old "last entry" key was Render's internal IP (all
+  visitors would share one bucket). `TRUSTED_PROXY_HOPS=3` in render.yaml. **Not live yet:**
+  /whoami still showed the 10.x key after the push, so the Blueprint must be synced.
+- [ ] **Live /ask returns 502 every time** (~16.8 s = the retry loop's 1+2+4+8 s backoff,
+  so every Groq attempt from Render fails with a network error or 5xx). The same code and
+  question against Neon from the laptop: 3/3 OK. The API never logged the cause, an
+  observability gap: it now logs the LLMError message (status/type, never the key).
+  Next: read Render's logs after a failing ask.
+- [x] **Frontend (`web/`, Next.js 16.3 + Tailwind 4):** AMD-inspired dark theme (black,
+  white text, cyan for anything clickable, red only for the logo and the main button).
+  Every page is **static**; the browser calls Render directly, and a `/health` ping on page
+  load starts waking the sleeping server early. Pages: `/` (landing with a recorded real
+  answer that plays audio), `/ask` (server-status indicator for the cold start, mapped
+  429/503/502 errors, ?q= deep links), `/accuracy` (eval tables with LIVE markers + known
+  limits, incl. "the live site has no reranker", so the 93.3% isn't claimed for it).
+  Vitest: 11 tests (citation parsing, time format, API error mapping). CI gets a `web`
+  job (eslint, tests, build).
+- Gotchas: template pinned `@types/node@20` on Node 24 (a Vitest peer conflict; fixed by
+  matching the runtime, not `--force`); the linter caught setState-in-effect; headless
+  Edge never renders narrower than 492 px, so phone screenshots below that are cropped,
+  not overflowing.
+
+**Next:** fix the live /ask 502 (logs), sync the Blueprint (hops), deploy `web/` on Vercel
+(Root Directory `web`), set ALLOWED_ORIGINS on Render to the Vercel URL, re-check /whoami.

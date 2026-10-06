@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* Earshot design tokens (AMD-inspired): black ground, white text, cyan-blue for anything
+   clickable or highlighted, red only for the brand mark and the one main button.
+   Each token becomes Tailwind classes, e.g. --color-panel -> bg-panel, text-panel. */
+@theme {
+  --color-bg: #000000;
+  --color-panel: #101114;
+  --color-raised: #1a1a1b;
+  --color-edge: #27282b;
+  --color-ink: #ffffff;
+  --color-ink-2: #e1e1e2;
+  --color-muted: #9d9fa2;
+  --color-accent: #00c2de;
+  --color-accent-hi: #12e1ff;
+  --color-brand: #e4202b;
+  --color-brand-hi: #f2353f;
+}
+
+/* Font tokens point at the variables next/font sets on <html>; `inline` resolves them there. */
+@theme inline {
+  --font-display: var(--font-barlow), "Segoe UI", system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, Consolas, monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

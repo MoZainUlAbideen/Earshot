@@ -90,9 +90,13 @@ def test_groq_rate_limit_maps_to_503_with_retry_after(corpus, test_db_url):
     assert r.status_code == 503 and r.headers["Retry-After"] == "31"
 
 
-def test_groq_error_maps_to_502(corpus, test_db_url):
-    with client_for(test_db_url, llm=fake_llm(error=LLMError("boom", retryable=True))) as c:
-        assert c.post("/ask", json={"question": "what do agents need"}).status_code == 502
+def test_groq_error_maps_to_502_and_logs_the_cause(corpus, test_db_url, caplog):
+    error = LLMError("Groq chat returned 503: over capacity", retryable=True)
+    with client_for(test_db_url, llm=fake_llm(error=error)) as c, caplog.at_level("ERROR", logger="earshot.api"):
+        r = c.post("/ask", json={"question": "what do agents need"})
+    assert r.status_code == 502
+    assert "over capacity" not in r.text                    # the visitor sees the generic message
+    assert "Groq chat returned 503: over capacity" in caplog.text  # the operator sees the cause
 
 
 def test_cors_allows_only_configured_origins(corpus, test_db_url, monkeypatch):

@@ -13,6 +13,7 @@ Cost protection has two layers:
 Models load once at startup and are warmed, so the first visitor doesn't pay for loading.
 """
 
+import logging
 import os
 import threading
 import time
@@ -30,6 +31,8 @@ from earshot.db import apply_schema, get_database_url
 from earshot.llm import LLMError
 from earshot.search import search
 from earshot.transcribe import RateLimited
+
+log = logging.getLogger("earshot.api")
 
 SNIPPET_CHARS = 300          # copyright: show short snippets, never whole transcripts
 DAILY_TOKEN_BUDGET = int(os.environ.get("DAILY_TOKEN_BUDGET", "180000"))  # under Groq's 200K/day
@@ -213,7 +216,10 @@ def create_app(*, embedder=None, reranker=None, llm=None, database_url: str | No
             except RateLimited as e:
                 return JSONResponse(status_code=503, headers={"Retry-After": str(int(e.retry_after) + 1)},
                                     content={"detail": "The AI service is busy; please try again shortly."})
-            except LLMError:
+            except LLMError as e:
+                # The visitor gets a generic message; the server log keeps the real cause.
+                # LLMError messages carry status codes and error types, never the API key.
+                log.error("ask failed: %s", e)
                 raise HTTPException(502, "The AI service returned an error; please try again.") from None
             record_usage(conn, result.tokens)
         return AskResponse(
