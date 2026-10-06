@@ -126,6 +126,36 @@ def cmd_eval_retrieval(conn, args) -> None:
               f"{m['top1_cite_within_15s']:9.2f} {str(m['top1_cite_offset_median_s']):>6} {str(m['latency_p50_ms']):>7}")
 
 
+def cmd_ask(conn, args) -> None:
+    from earshot.answer import answer
+    from earshot.embed import Embedder
+
+    result = answer(conn, args.question, embedder=Embedder())
+    print(result.text)
+    for c in result.citations:
+        print(f'  [{c.n}] {_clock(c.time)}  {c.title[:60]}  "{c.quote}"')
+    if result.rejected or result.removed_sentences:
+        print(f"  (critic: rejected {len(result.rejected)} citation(s), removed {result.removed_sentences} unsupported sentence(s))")
+    print(f"  ({result.tokens} tokens; search {result.seconds.get('search')}s, LLM {result.seconds.get('llm', 0)}s)")
+
+
+def cmd_eval_answers(conn, args) -> None:
+    import json
+
+    from earshot.embed import Embedder
+    from earshot.evals import retrieval
+    from earshot.evals.answers import evaluate_answers
+    from earshot.search import Reranker
+
+    result = evaluate_answers(conn, retrieval.load_golden(), embedder=Embedder(), reranker=Reranker(),
+                              limit=args.limit)
+    path = retrieval.RESULTS_PATH.parent / "answers.json"
+    path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    for key, value in result["summary"].items():
+        print(f"{key:32} {value}")
+    print(f"-> {path}")
+
+
 def cmd_status(conn, args) -> None:
     episodes = conn.execute("SELECT count(*) FROM episodes").fetchone()[0]
     print(f"episodes: {episodes}")
@@ -167,6 +197,10 @@ def main(argv: list[str] | None = None) -> None:
     p_search.add_argument("-k", type=int, default=5)
     p_search.set_defaults(func=cmd_search)
 
+    p_ask = sub.add_parser("ask", help="answer a question with verified, timestamped citations")
+    p_ask.add_argument("question")
+    p_ask.set_defaults(func=cmd_ask)
+
     p_eval = sub.add_parser("eval", help="quality evaluations (dev dependencies)")
     eval_sub = p_eval.add_subparsers(dest="eval_name", required=True)
     p_libri = eval_sub.add_parser("librispeech", help="WER + timestamp accuracy on LibriSpeech")
@@ -189,6 +223,9 @@ def main(argv: list[str] | None = None) -> None:
     p_ret = eval_sub.add_parser("retrieval", help="recall@k / MRR / citation offset per search mode")
     p_ret.add_argument("--rerankers", nargs="+", default=["Xenova/ms-marco-MiniLM-L-6-v2"])
     p_ret.set_defaults(func=cmd_eval_retrieval)
+    p_ans = eval_sub.add_parser("answers", help="answer the golden questions; citation accuracy, refusals, cost")
+    p_ans.add_argument("--limit", type=int, help="only the first N questions (saves LLM quota)")
+    p_ans.set_defaults(func=cmd_eval_answers)
     p_pod = eval_sub.add_parser("podcast", help="WER of each model vs your corrected reference")
     p_pod.add_argument("name")
     p_pod.set_defaults(func=cmd_eval_podcast, needs_db=False)

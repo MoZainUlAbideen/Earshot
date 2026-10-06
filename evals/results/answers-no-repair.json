@@ -1,0 +1,598 @@
+{
+  "summary": {
+    "questions": 45,
+    "answered_rate": 0.778,
+    "right_episode_rate": 0.756,
+    "citation_within_15s": 0.622,
+    "citation_within_60s": 0.689,
+    "citations_rejected_rate": 0.318,
+    "rejected_reasons": {
+      "quote not found verbatim in passage": 12,
+      "quote is a question, not a statement": 9
+    },
+    "answers_with_removed_sentences": 14,
+    "tokens_mean": 1310,
+    "seconds_p50": 8.05
+  },
+  "rows": [
+    {
+      "question": "When did Hall begin his role covering the U.S. State Department?",
+      "answered": true,
+      "best_offset_s": 0.7,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 1,
+      "tokens": 1270,
+      "seconds": 3.27
+    },
+    {
+      "question": "What directive did Irpin's mayor give to journalists after the filmmaker was shot?",
+      "answered": true,
+      "best_offset_s": 0.5,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1316,
+      "seconds": 1.8599999999999999
+    },
+    {
+      "question": "Which areas in the Kyiv region were said to be the most dangerous?",
+      "answered": true,
+      "best_offset_s": 0.6,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1311,
+      "seconds": 2.14
+    },
+    {
+      "question": "What was Sasha Kuchnova's goal in joining Fox?",
+      "answered": true,
+      "best_offset_s": 1.2,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1235,
+      "seconds": 2.04
+    },
+    {
+      "question": "What additional feature does OpenModel provide besides offering open\u2011weight models?",
+      "answered": true,
+      "best_offset_s": 6.2,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1238,
+      "seconds": 2.29
+    },
+    {
+      "question": "What new complexity is introduced when AI agents operate in the physical world?",
+      "answered": true,
+      "best_offset_s": 7.3,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1171,
+      "seconds": 1.5699999999999998
+    },
+    {
+      "question": "Why does the speaker consider open models essential for both academia and the industry?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 3,
+      "rejected_reasons": [
+        "quote not found verbatim in passage",
+        "quote not found verbatim in passage",
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 2,
+      "tokens": 1272,
+      "seconds": 1.99
+    },
+    {
+      "question": "What distinguishes classical simulators from neural simulation?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1293,
+      "seconds": 4.76
+    },
+    {
+      "question": "Why does the speaker say open models are important for innovation?",
+      "answered": true,
+      "best_offset_s": 40.2,
+      "right_episode": true,
+      "citations": 2,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1277,
+      "seconds": 9.67
+    },
+    {
+      "question": "Why does NVIDIA view open models as crucial for the AI ecosystem?",
+      "answered": true,
+      "best_offset_s": 207.0,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1299,
+      "seconds": 10.19
+    },
+    {
+      "question": "Is there an AI kill switch according to the speaker?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 2,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1273,
+      "seconds": 12.579999999999998
+    },
+    {
+      "question": "What service does Prediction Guard offer for managing AI agents?",
+      "answered": true,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1212,
+      "seconds": 3.76
+    },
+    {
+      "question": "What advice is given for beginning to incorporate rapidly evolving protocols such as the agent\u2011to\u2011agent protocol?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1212,
+      "seconds": 10.290000000000001
+    },
+    {
+      "question": "What attitude should you adopt to have your ideas considered when facing change?",
+      "answered": true,
+      "best_offset_s": 10.3,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote is a question, not a statement"
+      ],
+      "removed_sentences": 0,
+      "tokens": 1401,
+      "seconds": 8.43
+    },
+    {
+      "question": "What margin of error does the speaker aim for when trying to bound the uncertainty on metrics?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1341,
+      "seconds": 12.74
+    },
+    {
+      "question": "Why should a company use the same wording across its website, social media, and other online platforms?",
+      "answered": true,
+      "best_offset_s": 27.9,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 0,
+      "tokens": 1335,
+      "seconds": 6.470000000000001
+    },
+    {
+      "question": "What factor does the speaker say is becoming more important than relevance?",
+      "answered": true,
+      "best_offset_s": 0.4,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1238,
+      "seconds": 8.049999999999999
+    },
+    {
+      "question": "Why are industries reluctant to publish pricing information?",
+      "answered": true,
+      "best_offset_s": 0.9,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1344,
+      "seconds": 8.88
+    },
+    {
+      "question": "What research did the speaker refer to about Reddit's role in influencing citations?",
+      "answered": true,
+      "best_offset_s": 42.6,
+      "right_episode": true,
+      "citations": 2,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1290,
+      "seconds": 7.18
+    },
+    {
+      "question": "What does the speaker ask about the future of Codex and suggestions for its direction?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote is a question, not a statement"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1283,
+      "seconds": 16.959999999999997
+    },
+    {
+      "question": "What price threshold does the speaker use to allow the agent to make purchases automatically?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 1,
+      "tokens": 1388,
+      "seconds": 5.37
+    },
+    {
+      "question": "What is the speaker willing to give to an AI that acts as their personal recommender?",
+      "answered": true,
+      "best_offset_s": 8.4,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1327,
+      "seconds": 14.209999999999999
+    },
+    {
+      "question": "How does the speaker say an agent currently handles purchases from multiple merchants?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote is a question, not a statement"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1379,
+      "seconds": 5.68
+    },
+    {
+      "question": "What does Prediction Guard offer to keep control over autonomous agents?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 3,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1300,
+      "seconds": 3.0100000000000002
+    },
+    {
+      "question": "What does the speaker say is required to manage the rapid changes in model technology?",
+      "answered": true,
+      "best_offset_s": 4.0,
+      "right_episode": true,
+      "citations": 2,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1341,
+      "seconds": 8.66
+    },
+    {
+      "question": "Why is it hard for companies to develop their own large language models?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote is a question, not a statement"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1292,
+      "seconds": 12.74
+    },
+    {
+      "question": "Why does the speaker say more general robotics are needed for human environments compared to factories?",
+      "answered": true,
+      "best_offset_s": 9.1,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1226,
+      "seconds": 6.24
+    },
+    {
+      "question": "What does the speaker say demonstrates leadership?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1268,
+      "seconds": 8.78
+    },
+    {
+      "question": "What does the acronym MCP stand for and what is its purpose?",
+      "answered": true,
+      "best_offset_s": 1675.1,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1445,
+      "seconds": 12.690000000000001
+    },
+    {
+      "question": "How does the speaker advise people to avoid assuming everyone has the same needs?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote is a question, not a statement"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1354,
+      "seconds": 12.6
+    },
+    {
+      "question": "Which former Twitter executive did the speaker collaborate with?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1363,
+      "seconds": 4.08
+    },
+    {
+      "question": "Why does being part of the Agenda AI Foundation make developers feel more confident about building on a project?",
+      "answered": true,
+      "best_offset_s": 2.6,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 0,
+      "tokens": 1370,
+      "seconds": 10.149999999999999
+    },
+    {
+      "question": "What projects are part of the Agentic Foundation?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 2,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1276,
+      "seconds": 9.430000000000001
+    },
+    {
+      "question": "Do members of the working group set aside their external competition and cooperate just to get things done?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 2,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1412,
+      "seconds": 12.13
+    },
+    {
+      "question": "What type of organizations does Tier 1 Performance partner with for AI initiatives?",
+      "answered": true,
+      "best_offset_s": 467.3,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 0,
+      "tokens": 1296,
+      "seconds": 6.2299999999999995
+    },
+    {
+      "question": "What might happen to workers who currently handle pit stops when AI takes over parts of their tasks?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 0,
+      "tokens": 1472,
+      "seconds": 13.07
+    },
+    {
+      "question": "What factor is most important to them when evaluating L2 candidates?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 2,
+      "rejected_reasons": [
+        "quote is a question, not a statement",
+        "quote is a question, not a statement"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1392,
+      "seconds": 9.03
+    },
+    {
+      "question": "What does the speaker say is their primary focus at tier one?",
+      "answered": true,
+      "best_offset_s": 5.1,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1390,
+      "seconds": 10.149999999999999
+    },
+    {
+      "question": "What proportion of people surveyed were disappointed with AI quality?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote not found verbatim in passage"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1346,
+      "seconds": 8.01
+    },
+    {
+      "question": "What analogy does the speaker use to describe a model?",
+      "answered": false,
+      "best_offset_s": null,
+      "right_episode": false,
+      "citations": 0,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote is a question, not a statement"
+      ],
+      "removed_sentences": 1,
+      "tokens": 1214,
+      "seconds": 8.030000000000001
+    },
+    {
+      "question": "What does the speaker predict about the future role of multi\u2011agent architectures?",
+      "answered": true,
+      "best_offset_s": 6.3,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1205,
+      "seconds": 14.15
+    },
+    {
+      "question": "How do autonomous agents change the operating costs compared to simple chat interactions?",
+      "answered": true,
+      "best_offset_s": 11.0,
+      "right_episode": true,
+      "citations": 2,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1352,
+      "seconds": 4.6899999999999995
+    },
+    {
+      "question": "Why does the speaker prefer planning architecturally and strategically over worrying about token limits?",
+      "answered": true,
+      "best_offset_s": 0.6,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 1,
+      "rejected_reasons": [
+        "quote is a question, not a statement"
+      ],
+      "removed_sentences": 0,
+      "tokens": 1410,
+      "seconds": 5.13
+    },
+    {
+      "question": "What distinction does the speaker make between a fleet and a swarm of agents?",
+      "answered": true,
+      "best_offset_s": 0.0,
+      "right_episode": true,
+      "citations": 2,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1294,
+      "seconds": 17.16
+    },
+    {
+      "question": "What are the two layers distinguished in an agent harness architecture?",
+      "answered": true,
+      "best_offset_s": 1.4,
+      "right_episode": true,
+      "citations": 1,
+      "rejected": 0,
+      "rejected_reasons": [],
+      "removed_sentences": 0,
+      "tokens": 1247,
+      "seconds": 5.5
+    }
+  ]
+}

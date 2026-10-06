@@ -11,9 +11,9 @@ questions across many episodes at once. Every claim in an answer carries a
 > *"What do AI researchers say about scaling laws hitting a wall?"*
 > → An answer drawn from several episodes, with each claim linked to the moment it was said.
 
-**Status:** 🚧 In active development. Milestones 1, 2 and 4 are complete: ingestion,
-a crash-safe job queue, transcription with word-level timestamps, and evaluated hybrid
-search. Answering with citations is next. See [Roadmap](#roadmap).
+**Status:** 🚧 In active development. The full pipeline works from the command line:
+ingest → transcribe → search → **answers with verified, timestamped citations**, all
+evaluated. The live web app is next. See [Roadmap](#roadmap).
 
 ---
 
@@ -112,6 +112,20 @@ leg adds noise there), but it helps exact-term queries ("AGENTS.md") and keeps r
 high for the reranker. Passage *starts* are too coarse for citations (the answer sits
 about 15 s in), so answers cite the exact quoted words instead.
 
+**Answers:** the same 45 golden questions through the full pipeline (search → LLM answer
+→ deterministic citation critic → one repair pass). Measured 2026-10-06
+([results](evals/results/answers.json)).
+
+| | No repair pass | With repair pass |
+|---|---|---|
+| Answered (all are answerable) | 77.8% | **93.3%** |
+| Verified citation within ±15 s of the true answer | 62.2% | **80.0%** |
+| Tokens per answer | 1,310 | 1,842 |
+
+Every citation shown to a user has passed a plain-code check: the quote appears word for
+word in the transcript, and the timestamp is the moment its first word is spoken. If no
+claim survives the check, Earshot says it couldn't find an answer rather than guess.
+
 ```powershell
 uv run earshot eval librispeech --model whisper-large-v3
 ```
@@ -127,8 +141,8 @@ uv run earshot eval librispeech --model whisper-large-v3
 | **M2** Speech pipeline | VAD chunking, Whisper, timestamp stitching, WER eval | ✅ Done |
 | **M3** Enrichment | Ad detection, NER, chapters + summaries | Planned |
 | **M4** Retrieval | Hybrid keyword + embeddings, reranker, retrieval evals | ✅ Done |
-| **M5** Agents | Router, answerer with citations, deterministic critic | ⏳ Next |
-| **M6** Live product | FastAPI on Render, Next.js on Vercel, rate limiting | Planned |
+| **M5** Agents | Answerer with citations, deterministic critic, repair pass (router later) | ✅ MVP done |
+| **M6** Live product | FastAPI on Render, Next.js on Vercel, rate limiting | ⏳ Next |
 | **M7** LLMOps | Langfuse tracing, CI eval gate, cost per audio-hour, embedding versioning | Planned |
 
 Stretch goals: speaker diarization ("who said it"), spoken answer briefings (TTS),
@@ -202,6 +216,19 @@ Each hit is a ~45 s passage with the timestamp to cite. Search combines Postgres
 full-text and pgvector embeddings (Reciprocal Rank Fusion), then a cross-encoder reranks.
 Measure it with `uv run earshot eval retrieval`.
 
+Ask a question:
+
+```powershell
+uv run earshot ask "Why does NVIDIA think open models matter?"
+```
+
+```
+NVIDIA says open models let them learn what kind of GPUs and architecture the ecosystem
+needs [2]. They also let developers test and combine models quickly [2][3].
+  [2] 5:16  Open models and the future of Physical AI with NVIDIA  "through building the model, ..."
+  [3] 5:48  Open models and the future of Physical AI with NVIDIA  "there's a lot of reasons why ..."
+```
+
 ### Run the tests
 
 ```powershell
@@ -240,6 +267,9 @@ src/earshot/
   index.py        # build passages for finished episodes
   embed.py        # bge-small embeddings, versioned per row
   search.py       # keyword + vector + RRF + rerank
+  llm.py          # Groq chat client (JSON, retries, budget-aware)
+  answer.py       # answer → deterministic citation critic → repair pass
+  citations.py    # verbatim quote check + exact quote timestamp
   evals/          # WER (Whisper normalizer) + LibriSpeech eval, align-by-text scoring
 tests/            # pytest suite + fixtures (sample RSS feed)
 docs/             # project plan and decisions

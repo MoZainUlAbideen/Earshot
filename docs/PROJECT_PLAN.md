@@ -358,9 +358,9 @@ audio.
 - [x] **M2 complete**: LEARNINGS.md entry written, README results + roadmap
   updated. 141 tests passing.
 
-## 9. Next step
+### M4 + M5 log (plan, progress, findings)
 
-### M4 plan: retrieval (agreed 2026-10-06)
+#### M4 plan: retrieval (agreed 2026-10-06)
 - **Passages:** ~45 s windows, 15 s overlap (stride 30 s), snapped to word
   boundaries. An answer on a boundary lands whole in some window; 45 s ≈ 110
   words is a complete thought with a precise citation time.
@@ -435,23 +435,42 @@ audio.
 - [x] **M4 complete** (179 tests). LEARNINGS.md entry written; README
   results/roadmap updated.
 
+- [x] **M5 MVP, answering with verified citations** (`answer.py`, `citations.py`,
+  `evals/answers.py`; CLI `earshot ask`, `earshot eval answers`):
+  - Pipeline: hybrid+rerank top 5 → gpt-oss-120b JSON answer with [n] markers +
+    verbatim quotes → **deterministic critic**: the quote must appear verbatim
+    (production normalizer, not the dev-only Whisper one), must not be a question,
+    and is located in the word timings (citation time = the quote's first word).
+    Sentences without a verified citation are removed; nothing left → refusal.
+  - **Repair pass**: if any citation fails, ONE follow-up tells the model what
+    failed and why; its answer goes through the same critic (safety unchanged).
+  - Real failures that shaped it: the model cited the *host's question*
+    (verbatim but not evidence), and a prompt instruction didn't stop it, so a
+    deterministic "no questions" rule was added. Without repair, 8 of 10
+    refusals were "critic rejected every quote" (0 were retrieval misses).
+  - **Results (45 golden questions)**, no repair → repair: answered 77.8% →
+    **93.3%**; citation ≤15 s 62.2% → **80.0%**; ≤60 s 68.9% → 84.4%; answers
+    losing sentences 14 → 2; tokens 1,310 → **1,842** (free tier ≈ 108
+    answers/day); p50 8.0 → 8.6 s. 205 tests.
+  - Known limits: the critic proves a quote *exists*, not that it *supports*
+    the sentence (questions without "?" slip through; misattribution is
+    measured by citation accuracy, ~20% miss at ±15 s). Questions *about*
+    questions ("what does the speaker ask…") get refused by the no-questions
+    rule. Router (compare / summarize / find quote) is deferred until after the
+    MVP ships.
+
 ## 9. Next step
 
-### M5 plan: answering with verified citations (to agree before coding)
-- **Retrieve:** hybrid+rerank top 5 (R@5 = 0.93).
-- **Answer:** gpt-oss-120b gets the question plus numbered passages (episode
-  title, time) and must return JSON: an answer with [n] markers, and for each
-  [n] a verbatim quote from passage n.
-- **Critic (deterministic, not an LLM):** every quote must appear verbatim
-  (normalized) in its cited passage; then locate it in the word timings →
-  **citation time = the quote's first word** (fixes the ~15 s passage offset).
-  Unverifiable citations are dropped; an answer left with no verified
-  citation becomes "I couldn't find this in the episodes" (no unsupported
-  claims). Possibly one repair retry.
-- **Router:** MVP is a single path. Add the router (compare shows / summarize
-  episode / find quote) after the MVP works.
-- **Eval:** reuse the 45 golden questions → citation accuracy (verified cite
-  within ±15 s of answer_time), quote-verification rate (faithfulness),
-  refusal rate, tokens per answer (budget: 200K/day).
-- **Budget guard:** count tokens per answer; the API's daily cap shapes M6
-  rate limiting.
+### M6 plan: live product (to agree before coding)
+- **Backend:** FastAPI on Render (Docker). Load the embedder and reranker once at
+  startup. Endpoints: `GET /health`, `POST /ask`, `GET /search`, `GET /episodes`.
+- **Budget guard:** a daily token counter in Postgres; refuse politely before
+  the 200K/day Groq cap (~108 answers/day). Per-visitor rate limiting (token
+  bucket per IP) so one visitor can't drain the day.
+- **Frontend:** Next.js on Vercel: question box → answer with numbered
+  citations → audio player that streams the publisher's audio (never
+  rehosted) and jumps to the citation time.
+- **Hosting checks first:** Render free tier RAM vs embedder 67 MB + reranker
+  130 MB + Python; Render Postgres + pgvector availability; cold starts; the
+  DAI timestamp-drift risk for playback (section 6).
+- CI (GitHub Actions: tests on every push) before deploying.

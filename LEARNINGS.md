@@ -296,3 +296,62 @@ plus a 60-second interview script.
 > claim to measure, not assume. I picked the reranker on the latency trade-off: one question
 > behind the most accurate model at half the latency. And the eval showed passage-level
 > citations land about 15 seconds early, so the answering stage cites the exact quoted words."
+
+---
+
+## M5 — Answering with verified citations (MVP, 2026-10-06)
+
+### What we built
+- `earshot ask "question"`: hybrid+rerank top 5 → `gpt-oss-120b` writes a JSON answer with
+  `[n]` markers and a verbatim quote per marker → a **deterministic critic** checks every quote
+  against the transcript and timestamps it at its first word → unsupported sentences are
+  removed → one **repair pass** for failed quotes → or a refusal.
+- `earshot eval answers`: answered rate, citation accuracy (±15/60 s of the true answer),
+  rejection reasons, tokens and latency over the 45 golden questions.
+
+### Why
+- **A deterministic verifier around a probabilistic generator:** the model can invent a
+  quote, but a string check against the transcript can't be talked into accepting one.
+- **Word-level citation times:** M4 showed passage starts are ~15 s early; locating the quote
+  in the word timings fixes that.
+- **The production normalizer is separate from the eval normalizer:** the WER normalizer is a
+  dev dependency and wouldn't exist on Render.
+- **Refuse rather than guess:** every sentence a user sees must point to a real moment.
+
+### What broke and how we fixed it
+1. **Verbatim but not evidence:** the model quoted the *host's question*. The critic proves a
+   quote exists, not that it supports the claim. A prompt instruction didn't fix it, so I
+   added a deterministic rule: a quote containing "?" is rejected. Partial: questions without
+   "?" still slip through, which citation accuracy measures.
+2. **Too strict without a second chance:** 8 of 10 refusals were "critic rejected every quote"
+   (0 were retrieval misses, found by classifying each refusal). A one-shot repair pass,
+   re-verified by the same critic, took answered 77.8% → 93.3% and accurate citations
+   62.2% → 80.0%, for +40% tokens.
+3. **My output filter hid an answer:** I grepped out lines containing "developer" (to hide a
+   Windows warning), and the NVIDIA answer contained "developers". Checked before blaming
+   the code.
+4. **Shell quoting:** a long bash heredoc full of apostrophes failed to parse. Bash ran none of
+   it (checked file by file), so I moved the edit into a Python script file instead.
+5. **Budget awareness:** the eval stops gracefully on a daily-cap 429 and keeps partial
+   results; the first run's results are kept (`answers-no-repair.json`) for comparison.
+
+### Results (45 golden questions)
+| | No repair | With repair |
+|---|---|---|
+| Answered | 77.8% | 93.3% |
+| Citation within ±15 s | 62.2% | 80.0% |
+| Tokens / answer | 1,310 | 1,842 (≈108 answers/day free) |
+
+### 60-second interview script
+> "Earshot answers with citations that a plain piece of code has verified. The LLM gets the top
+> five reranked passages and must return JSON with a verbatim quote behind every claim. A
+> deterministic critic checks each quote word for word against the transcript, rejects quotes
+> that are questions, and timestamps the citation at the exact word where the quote starts.
+> Any sentence without a verified citation is removed, and if nothing survives, the system
+> refuses instead of guessing. When I measured it, nearly a third of the model's 'verbatim'
+> quotes failed, and most refusals were the critic rejecting everything, not search failing.
+> So I added one repair round: the model is told which quotes failed and why, and its answer
+> goes through the same check. That took answered questions from 78 to 93 percent and accurate
+> citations from 62 to 80, at 40 percent more tokens, a cost I budget for in the live app's rate
+> limits. The honest limit: string checks prove a quote exists, not that it supports the claim,
+> so I track citation accuracy separately."
