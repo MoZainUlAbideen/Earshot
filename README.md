@@ -1,5 +1,6 @@
 # Earshot
 
+### Live Frontend : https://earshot-ten-pi.vercel.app/
 **Ask any podcast a question and hear the exact moment it was answered.**
 
 Thousands of hours of expert conversation live in podcasts, and almost none of it is
