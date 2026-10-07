@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AnswerView } from "@/components/answer-view";
+import { SoundRibbon } from "@/components/sound-ribbon";
 import type { Answer } from "@/lib/api";
 import example from "@/data/example-answer.json";
 
@@ -35,88 +36,109 @@ const NUMBERS = [
 
 export default function Home() {
   return (
-    <main className="mx-auto max-w-6xl px-4 sm:px-6">
-      <section className="grid max-w-3xl gap-5 pt-16 pb-12 sm:pt-24">
-        <p className="font-mono text-xs uppercase tracking-wider text-muted">
-          9 episodes · 875 searchable moments · every quote checked
-        </p>
-        <h1 className="font-display text-4xl leading-[1.04] font-bold tracking-tight sm:text-6xl">
-          Ask any podcast a question. <span className="text-accent">Hear the exact moment</span> it was answered.
-        </h1>
-        <p className="max-w-[58ch] text-lg text-ink-2">
-          Earshot searches podcast transcripts, writes a short answer, and links every claim to the second it was
-          said in the original audio.
-        </p>
-        <div className="flex flex-wrap gap-3 pt-1">
-          <Link href="/ask" className="rounded bg-brand px-5 py-3 font-semibold text-white hover:bg-brand-hi">
-            Ask a question
-          </Link>
-          <Link href="/accuracy" className="rounded border border-white/35 px-5 py-3 font-semibold hover:border-white">
-            How we measure accuracy
-          </Link>
-        </div>
-      </section>
-
-      <section className="grid gap-px overflow-hidden rounded-md border border-edge bg-edge sm:grid-cols-2 lg:grid-cols-4">
-        {FEATURES.map((f) => (
-          <div key={f.title} className="grid content-start gap-1.5 bg-panel p-5">
-            <span className="font-mono text-xs text-accent">{f.tag}</span>
-            <h3 className="font-display text-lg font-semibold">{f.title}</h3>
-            <p className="text-sm text-muted">{f.body}</p>
-          </div>
-        ))}
-      </section>
-
-      <section id="how" className="scroll-mt-20 py-16">
-        <h2 className="font-display text-3xl font-bold">How it works</h2>
-        <ol className="mt-6 grid gap-6 md:grid-cols-3">
-          {STEPS.map((s, i) => (
-            <li key={s.title} className="grid content-start gap-2 border-t border-edge pt-4">
-              <span className="font-mono text-xs text-muted">Step {i + 1}</span>
-              <h3 className="font-display text-xl font-semibold">{s.title}</h3>
-              <p className="text-ink-2">{s.body}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="grid gap-8 pb-16 lg:grid-cols-[1fr_1.4fr]">
-        <div className="grid content-start gap-4">
-          <h2 className="font-display text-3xl font-bold">A real answer</h2>
-          <p className="text-ink-2">
-            Asked of the live index: <span className="text-ink">“{exampleAnswer.question}”</span> Click a quote to
-            hear it in the original episode.
-          </p>
-          <p className="text-sm text-muted">Try another question:</p>
-          <div className="flex flex-wrap gap-2">
-            {EXAMPLE_QUESTIONS.map((q) => (
-              <Link
-                key={q}
-                href={{ pathname: "/ask", query: { q } }}
-                className="rounded border border-edge bg-panel px-3 py-2 text-sm text-ink-2 hover:border-accent hover:text-ink"
-              >
-                {q}
+    <main>
+      {/* Full-bleed hero: the ribbon runs to the screen edge, the text stays in the column. */}
+      <section className="relative overflow-hidden border-b border-edge">
+        <SoundRibbon />
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="grid max-w-3xl gap-5 pt-20 pb-24 sm:pt-28 sm:pb-32">
+            <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted">
+              <span className="size-1.5 rounded-full bg-brand" aria-hidden="true" />
+              9 episodes · 875 searchable moments · every quote checked
+            </p>
+            <h1 className="font-display text-4xl leading-[1.04] font-bold tracking-tight sm:text-6xl">
+              Ask any podcast a question. <span className="text-brand">Hear the exact moment</span> it was answered.
+            </h1>
+            <p className="max-w-[58ch] text-lg text-ink-2">
+              Earshot searches podcast transcripts, writes a short answer, and links every claim to the second it
+              was said in the original audio.
+            </p>
+            <div className="flex flex-wrap gap-3 pt-1">
+              <Link href="/ask" className="rounded bg-brand px-5 py-3 font-semibold text-white hover:bg-brand-hi">
+                Ask a question
               </Link>
-            ))}
+              <Link
+                href="/accuracy"
+                className="rounded border border-white/35 bg-black/40 px-5 py-3 font-semibold backdrop-blur hover:border-white"
+              >
+                How we measure accuracy
+              </Link>
+            </div>
           </div>
-        </div>
-        <div className="min-w-0">
-          <AnswerView answer={exampleAnswer} />
         </div>
       </section>
 
-      <section className="grid gap-px overflow-hidden rounded-md border border-edge bg-edge sm:grid-cols-3">
-        {NUMBERS.map((n) => (
-          <div key={n.label} className="bg-panel p-5">
-            <p className="font-display text-3xl font-bold tabular-nums">{n.value}</p>
-            <p className="mt-1 text-sm text-muted">{n.label}</p>
+      <div className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
+        <section className="grid gap-px overflow-hidden rounded-md border border-edge bg-edge sm:grid-cols-2 lg:grid-cols-4">
+          {FEATURES.map((f) => (
+            <div key={f.title} className="grid content-start gap-1.5 bg-panel p-5 transition-colors hover:bg-raised">
+              <span className="font-mono text-xs text-muted">{f.tag}</span>
+              <h3 className="font-display text-lg font-semibold">{f.title}</h3>
+              <p className="text-sm text-muted">{f.body}</p>
+            </div>
+          ))}
+        </section>
+
+        <section id="how" className="scroll-mt-20 py-16">
+          <h2 className="font-display text-3xl font-bold">How it works</h2>
+          <ol className="mt-6 grid gap-6 md:grid-cols-3">
+            {STEPS.map((s, i) => (
+              <li key={s.title} className="grid content-start gap-2 border-t border-edge pt-4">
+                <span className="font-mono text-xs text-muted">Step {i + 1}</span>
+                <h3 className="font-display text-xl font-semibold">{s.title}</h3>
+                <p className="text-ink-2">{s.body}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="grid gap-8 pb-16 lg:grid-cols-[1fr_1.4fr]">
+          <div className="grid content-start gap-4">
+            <h2 className="font-display text-3xl font-bold">A real answer</h2>
+            <p className="text-ink-2">
+              Asked of the live index: <span className="text-ink">“{exampleAnswer.question}”</span> Click a quote to
+              hear it in the original episode.
+            </p>
+            <p className="text-sm text-muted">Try another question:</p>
+            <div className="flex flex-wrap gap-2">
+              {EXAMPLE_QUESTIONS.map((q) => (
+                <Link
+                  key={q}
+                  href={{ pathname: "/ask", query: { q } }}
+                  className="rounded border border-edge bg-panel px-3 py-2 text-sm text-ink-2 transition hover:-translate-y-px hover:border-white/60 hover:text-ink"
+                >
+                  {q}
+                </Link>
+              ))}
+            </div>
           </div>
-        ))}
-      </section>
-      <p className="pt-3 pb-16 text-sm text-muted">
-        Measured on 2026-10-05 and 2026-10-06.{" "}
-        <Link href="/accuracy" className="text-accent hover:text-accent-hi">See every test and its limits →</Link>
-      </p>
+          <div className="relative min-w-0">
+            {/* A soft red light spilling onto the black behind the card. */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -inset-10 rounded-full bg-[radial-gradient(closest-side,rgba(228,32,43,0.18),transparent)] blur-2xl"
+            />
+            <div className="relative">
+              <AnswerView answer={exampleAnswer} />
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-px overflow-hidden rounded-md border border-edge bg-edge sm:grid-cols-3">
+          {NUMBERS.map((n) => (
+            <div key={n.label} className="bg-panel p-5">
+              <p className="font-display text-3xl font-bold tabular-nums">{n.value}</p>
+              <p className="mt-1 text-sm text-muted">{n.label}</p>
+            </div>
+          ))}
+        </section>
+        <p className="pt-3 pb-16 text-sm text-muted">
+          Measured on 2026-10-05 and 2026-10-06.{" "}
+          <Link href="/accuracy" className="text-ink underline decoration-white/30 underline-offset-4 hover:decoration-white">
+            See every test and its limits →
+          </Link>
+        </p>
+      </div>
     </main>
   );
 }

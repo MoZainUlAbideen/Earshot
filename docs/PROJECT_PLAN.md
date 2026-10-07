@@ -569,5 +569,12 @@ audio.
   Edge never renders narrower than 492 px, so phone screenshots below that are cropped,
   not overflowing.
 
+- [x] **Frontend v2 (Zain's direction):** text strictly white + red (the cyan token became
+  white, a 2-line change because every use went through the `accent` token); red only on
+  the logo, the main buttons, one hero phrase and the citation currently playing. AMD-style
+  hero art drawn live on a canvas (`sound-ribbon.tsx`): 110 sound-wave lines along one
+  folding path, additive blending for glow, drifting particles; paused off screen or in a
+  background tab, a still frame for reduce-motion. Dimmer band on /ask and /accuracy.
+
 **Next:** fix the live /ask 502 (logs), sync the Blueprint (hops), deploy `web/` on Vercel
 (Root Directory `web`), set ALLOWED_ORIGINS on Render to the Vercel URL, re-check /whoami.

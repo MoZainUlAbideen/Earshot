@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </nav>
           </div>
         </header>
-        <div className="flex-1">{children}</div>
+        <div className="relative flex-1">{children}</div>
         <footer className="border-t border-edge">
           <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-3 px-4 py-6 text-sm text-muted sm:px-6">
             <span>Earshot · audio belongs to its publishers and streams from their servers</span>

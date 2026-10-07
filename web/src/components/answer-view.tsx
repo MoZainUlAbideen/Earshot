@@ -76,7 +76,7 @@ export function AnswerView({ answer }: { answer: Answer }) {
               <button
                 type="button"
                 onClick={() => play(c)}
-                className={`grid w-full gap-1 rounded border bg-panel p-3 text-left transition-colors hover:border-accent ${active ? "border-accent" : "border-edge"}`}
+                className={`grid w-full gap-1 rounded border bg-panel p-3 text-left transition-colors hover:border-white/60 ${active ? "border-brand" : "border-edge"}`}
               >
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs">
                   <span className="text-accent">[{c.n}]</span>

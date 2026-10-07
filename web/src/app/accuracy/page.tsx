@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { RibbonBand } from "@/components/ribbon-band";
 
 export const metadata: Metadata = { title: "Accuracy" };
 
@@ -84,47 +85,50 @@ function Section({ title, intro, children }: { title: string; intro: string; chi
 
 export default function AccuracyPage() {
   return (
-    <main className="mx-auto grid max-w-4xl gap-14 px-4 pt-12 pb-20 sm:px-6">
-      <div className="grid gap-3">
-        <h1 className="font-display text-4xl font-bold">How accurate is Earshot?</h1>
-        <p className="max-w-[70ch] text-lg text-ink-2">
-          Each stage is measured on its own: transcription, search, and the final answers. These are the results,
-          including where the live site falls short of them.
-        </p>
-      </div>
-
-      <Section
-        title="Transcription"
-        intro="73 utterances from LibriSpeech, a standard read-speech test set, run through the full pipeline. Words are aligned by text first, then their timestamps are measured, so timing errors can't hide inside the word error rate. Measured 2026-10-05."
-      >
-        <Table {...ASR} highlight={1} />
-      </Section>
-
-      <Section
-        title="Search"
-        intro="45 paraphrased questions over 9 episodes (875 passages), each with a known answer time. Recall@5 is how often the right passage is in the top 5 results. Measured 2026-10-06 on a laptop CPU."
-      >
-        <Table {...RETRIEVAL} highlight={2} />
-      </Section>
-
-      <Section
-        title="Answers"
-        intro="The same 45 questions through search, the language model, the quote checker and one repair pass, where the model is told which quotes failed and tries again. Measured 2026-10-06."
-      >
-        <Table {...ANSWERS} />
-      </Section>
-
-      <section className="grid gap-4">
-        <h2 className="font-display text-2xl font-bold">Known limits</h2>
-        <div className="grid gap-px overflow-hidden rounded-md border border-edge bg-edge sm:grid-cols-2">
-          {LIMITS.map((l) => (
-            <div key={l.title} className="grid content-start gap-2 bg-panel p-5">
-              <h3 className="font-display text-lg font-semibold">{l.title}</h3>
-              <p className="text-sm text-muted">{l.body}</p>
-            </div>
-          ))}
+    <>
+      <RibbonBand />
+      <main className="relative mx-auto grid max-w-4xl gap-14 px-4 pt-12 pb-20 sm:px-6">
+        <div className="grid gap-3">
+          <h1 className="font-display text-4xl font-bold">How accurate is Earshot?</h1>
+          <p className="max-w-[70ch] text-lg text-ink-2">
+            Each stage is measured on its own: transcription, search, and the final answers. These are the results,
+            including where the live site falls short of them.
+          </p>
         </div>
-      </section>
-    </main>
+
+        <Section
+          title="Transcription"
+          intro="73 utterances from LibriSpeech, a standard read-speech test set, run through the full pipeline. Words are aligned by text first, then their timestamps are measured, so timing errors can't hide inside the word error rate. Measured 2026-10-05."
+        >
+          <Table {...ASR} highlight={1} />
+        </Section>
+
+        <Section
+          title="Search"
+          intro="45 paraphrased questions over 9 episodes (875 passages), each with a known answer time. Recall@5 is how often the right passage is in the top 5 results. Measured 2026-10-06 on a laptop CPU."
+        >
+          <Table {...RETRIEVAL} highlight={2} />
+        </Section>
+
+        <Section
+          title="Answers"
+          intro="The same 45 questions through search, the language model, the quote checker and one repair pass, where the model is told which quotes failed and tries again. Measured 2026-10-06."
+        >
+          <Table {...ANSWERS} />
+        </Section>
+
+        <section className="grid gap-4">
+          <h2 className="font-display text-2xl font-bold">Known limits</h2>
+          <div className="grid gap-px overflow-hidden rounded-md border border-edge bg-edge sm:grid-cols-2">
+            {LIMITS.map((l) => (
+              <div key={l.title} className="grid content-start gap-2 bg-panel p-5">
+                <h3 className="font-display text-lg font-semibold">{l.title}</h3>
+                <p className="text-sm text-muted">{l.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+    </>
   );
 }

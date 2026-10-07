@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-/* Earshot design tokens (AMD-inspired): black ground, white text, cyan-blue for anything
-   clickable or highlighted, red only for the brand mark and the one main button.
+/* Earshot design tokens (AMD-inspired): black ground, text in white only, white for anything
+   clickable or highlighted, red only for the logo, the main buttons and one hero phrase.
    Each token becomes Tailwind classes, e.g. --color-panel -> bg-panel, text-panel. */
 @theme {
   --color-bg: #000000;
@@ -11,8 +11,8 @@
   --color-ink: #ffffff;
   --color-ink-2: #e1e1e2;
   --color-muted: #9d9fa2;
-  --color-accent: #00c2de;
-  --color-accent-hi: #12e1ff;
+  --color-accent: #ffffff; /* was AMD cyan; the site is now strictly white + red */
+  --color-accent-hi: #ffffff;
   --color-brand: #e4202b;
   --color-brand-hi: #f2353f;
 }
